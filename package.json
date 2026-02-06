@@ -2,11 +2,16 @@
   "name": "au-esports-platform",
   "private": true,
   "scripts": {
-    "dev:web": "npm --prefix apps/web run dev",
-    "dev:api": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"cd apps/api; if (!(Test-Path .venv)) { python -m venv .venv }; .\\.venv\\Scripts\\Activate.ps1; pip install -r requirements.txt; uvicorn app.main:app --reload --port 8000\"",
     "install:web": "npm --prefix apps/web install",
-    "install:api": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"cd apps/api; if (!(Test-Path .venv)) { python -m venv .venv }; .\\.venv\\Scripts\\Activate.ps1; pip install -r requirements.txt\"",
+    "dev:web": "npm --prefix apps/web run dev",
+    "lint:web": "npm --prefix apps/web run lint",
     "build:web": "npm --prefix apps/web run build",
-    "lint:web": "npm --prefix apps/web run lint"
+    "install:api": "powershell -NoProfile -ExecutionPolicy Bypass -File infra/scripts/api_install.ps1",
+    "dev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File infra/scripts/api_dev.ps1",
+    "dev": "concurrently -n API,WEB \"npm run dev:api\" \"npm run dev:web\""
+
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
