@@ -36,7 +36,7 @@ export default function Home() {
             <button key={page} className="hover:underline">
               {page}
             </button>
-          ))}p
+          ))}
         </nav>
       </header>
 
