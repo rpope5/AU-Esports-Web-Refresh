@@ -21,24 +21,36 @@ export default function Home() {
     '/Hub/PlayVS.svg',
     '/Hub/CCL.svg',
   ];
+  
+  // Create looping arrays for infinite carousel (multiply to make reset imperceptible)
+  const displayConferences = [...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences];
+  const displayImages = [...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages];
+  
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   const prev = () => {
-    setCurrentConfIndex((prevIndex) => (prevIndex === 0 ? conferences.length - 1 : prevIndex - 1));
+    setCurrentConfIndex((prevIndex) => (prevIndex === 0 ? displayConferences.length - 1 : prevIndex - 1));
   };
 
   const next = () => {
-    setCurrentConfIndex((prevIndex) => (prevIndex === conferences.length - 1 ? 0 : prevIndex + 1));
+    setCurrentConfIndex((prevIndex) => prevIndex + 1);
   };
+
+  // Reset loop when reaching midpoint to feel infinite
+  useEffect(() => {
+    if (currentConfIndex >= conferences.length * 10) {
+      setCurrentConfIndex(0);
+    }
+  }, [currentConfIndex]);
 
   // Autoplay vertical carousel
   useEffect(() => {
     const id = setInterval(() => {
-      setCurrentConfIndex((i) => (i === conferences.length - 1 ? 0 : i + 1));
+      setCurrentConfIndex((i) => i + 1);
     }, 3000);
     return () => clearInterval(id);
-  }, [conferences.length]);
+  }, []);
 
   return (
     <div className="min-hscreen bg-black text-white">
@@ -63,24 +75,21 @@ export default function Home() {
 
           <div className="w-full flex flex-col items-center gap-2">
 
-            <div className="overflow-hidden w-full h-36">
+            <div className="overflow-hidden w-full h-[36rem]">
               <div
                 className="transition-transform duration-700 relative"
-                style={{ transform: `translateY(-${currentConfIndex * 9}rem)` }}
+                style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
               >
-                {conferences.map((conf, idx) => {
-                  const isActive = idx === currentConfIndex;
-                  return (
-                    <div
-                      key={`${conf}-${idx}`}
-                      onClick={() => setSelectedConf(conf)}
-                      className={`w-full h-36 flex flex-col items-center justify-center text-lg cursor-pointer transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'} ${selectedConf === conf ? 'bg-gray-700 font-semibold' : ''}`}
-                    >
-                        <span className="mb-3 text-white text-lg font-medium">{conf}</span>
-                        <Image src={conferenceImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
-                    </div>
-                  );
-                })}
+                {displayConferences.map((conf, idx) => (
+                  <div
+                    key={`${conf}-${idx}`}
+                    onClick={() => setSelectedConf(conferences[idx % conferences.length])}
+                    className={`w-full h-48 flex flex-col items-center justify-center text-lg cursor-pointer ${selectedConf === conf ? 'bg-gray-700 font-semibold' : ''}`}
+                  >
+                    <span className="mb-3 text-white text-lg font-medium">{conf}</span>
+                    <Image src={displayImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
