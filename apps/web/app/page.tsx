@@ -13,6 +13,14 @@ export default function Home() {
     "PlayVS",
     "CCL"
   ];
+  const conferenceImages = [
+    '/Hub/ECAC.svg',
+    '/Hub/GLEC.svg',
+    '/Hub/NECC.svg',
+    '/Hub/CKL.svg',
+    '/Hub/PlayVS.svg',
+    '/Hub/CCL.svg',
+  ];
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
@@ -35,10 +43,10 @@ export default function Home() {
   return (
     <div className="min-hscreen bg-black text-white">
       {/*Header*/}
-      <header className="w-full bg-gray-900 text-white px-8 py-4 flex justify-between items-center">
+      <header className="w-full bg-[#5C068C] text-white px-8 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Image src="/Eagle.png" alt="Ashland Eagle Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <h1 className="text-2xl font-bold">Ashland Esports</h1>
+          <h1 className="text-2xl font-Gotham-Bold">Ashland Esports</h1>
         </div>
         <nav className="flex gap-6">
           {pages.map((page) => (
@@ -55,20 +63,24 @@ export default function Home() {
 
           <div className="w-full flex flex-col items-center gap-2">
 
-            <div className="overflow-hidden w-full h-16">
+            <div className="overflow-hidden w-full h-36">
               <div
-                className="transition-transform duration-700"
-                style={{ transform: `translateY(-${currentConfIndex * 4}rem)` }}
+                className="transition-transform duration-700 relative"
+                style={{ transform: `translateY(-${currentConfIndex * 9}rem)` }}
               >
-                {conferences.map((conf, idx) => (
-                  <div
-                    key={`${conf}-${idx}`}
-                    onClick={() => setSelectedConf(conf)}
-                    className={`w-full h-16 flex items-center justify-center text-lg cursor-pointer ${selectedConf === conf ? 'bg-gray-700 font-semibold' : ''}`}
-                  >
-                    {conf}
-                  </div>
-                ))}
+                {conferences.map((conf, idx) => {
+                  const isActive = idx === currentConfIndex;
+                  return (
+                    <div
+                      key={`${conf}-${idx}`}
+                      onClick={() => setSelectedConf(conf)}
+                      className={`w-full h-36 flex flex-col items-center justify-center text-lg cursor-pointer transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'} ${selectedConf === conf ? 'bg-gray-700 font-semibold' : ''}`}
+                    >
+                        <span className="mb-3 text-white text-lg font-medium">{conf}</span>
+                        <Image src={conferenceImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
