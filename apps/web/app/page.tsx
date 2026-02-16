@@ -14,15 +14,15 @@ export default function Home() {
     "CCL"
   ];
   const conferenceImages = [
-    '/Hub/ECAC.svg',
-    '/Hub/GLEC.svg',
-    '/Hub/NECC.svg',
-    '/Hub/CKL.svg',
-    '/Hub/PlayVS.svg',
-    '/Hub/CCL.svg',
+    '/ECAC.jpg',
+    '/GLEC.jpg',
+    '/NECC.jpg',
+    '/CKL.jpg',
+    '/PlayVS.jpg',
+    '/CCL.jpg',
   ];
   
-  // Create looping arrays for infinite carousel (multiply to make reset imperceptible)
+  
   const displayConferences = [...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences];
   const displayImages = [...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages];
   
@@ -37,14 +37,14 @@ export default function Home() {
     setCurrentConfIndex((prevIndex) => prevIndex + 1);
   };
 
-  // Reset loop when reaching midpoint to feel infinite
+  
   useEffect(() => {
     if (currentConfIndex >= conferences.length * 10) {
       setCurrentConfIndex(0);
     }
   }, [currentConfIndex]);
 
-  // Autoplay vertical carousel
+ 
   useEffect(() => {
     const id = setInterval(() => {
       setCurrentConfIndex((i) => i + 1);
@@ -53,8 +53,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-hscreen bg-black text-white">
-      {/*Header*/}
+    <div className="min-hscreen bg-white text-black">
       <header className="w-full bg-[#5C068C] text-white px-8 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Image src="/Eagle.png" alt="Ashland Eagle Logo" width={40} height={40} className="w-10 h-10 object-contain" />
@@ -70,12 +69,12 @@ export default function Home() {
       </header>
 
       <main className="flex justify-between items-start px-10 py-10 gap-6">
-        <aside className="w-[20%] flex flex-col items-center text-white">
-          <div className="text-xl mb-4">Leages</div>
+        <aside className="w-[20%] flex flex-col items-center text-black">
+          <div className="text-xl mb-4">Leagues</div>
 
           <div className="w-full flex flex-col items-center gap-2">
 
-            <div className="overflow-hidden w-full h-[36rem]">
+            <div className="overflow-hidden w-full h-[36rem] bg-[#FFC72C] rounded-lg">
               <div
                 className="transition-transform duration-700 relative"
                 style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
@@ -84,9 +83,9 @@ export default function Home() {
                   <div
                     key={`${conf}-${idx}`}
                     onClick={() => setSelectedConf(conferences[idx % conferences.length])}
-                    className={`w-full h-48 flex flex-col items-center justify-center text-lg cursor-pointer ${selectedConf === conf ? 'bg-gray-700 font-semibold' : ''}`}
+                    className={`w-full h-48 flex flex-col items-center justify-center text-lg cursor-pointer transition-colors duration-200 hover:bg-[#5C068C] ${selectedConf === conf ? 'bg-[#5C068C] text-white font-semibold' : ''}`}
                   >
-                    <span className="mb-3 text-white text-lg font-medium">{conf}</span>
+                    <span className="mb-3 text-black text-lg font-Gotham-Bold">{conf}</span>
                     <Image src={displayImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
                   </div>
                 ))}
@@ -95,7 +94,7 @@ export default function Home() {
           </div>
         </aside>
 
-        <div className="w-[60%]">
+        <div className="w-[60%] h-[500px] border-2 border-gray-700 rounded-lg overflow-hidden">
           <video
             src="/AshlandEsports.mp4"
             autoPlay
@@ -105,7 +104,7 @@ export default function Home() {
           />
         </div>
 
-        <div className="w-[20%] h-[500px]">
+        <div className="w-[20%] h-[650px]">
           <iframe
             src=""
             className="w-full h-full px-4 py-2 border-2 border-gray-700 rounded-lg"
