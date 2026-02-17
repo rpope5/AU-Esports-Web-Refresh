@@ -17,7 +17,7 @@ export default function Home() {
     '/ECAC.jpg',
     '/GLEC.jpg',
     '/NECC.jpg',
-    '/CKL.jpg',
+    '/CKL.png',
     '/PlayVS.jpg',
     '/CCL.jpg',
   ];
@@ -37,7 +37,8 @@ export default function Home() {
         const resX = await fetch('/data/matches.xlsx');
         if (resX.ok) {
           const buffer = await resX.arrayBuffer();
-          const XLSX = await import('xlsx');
+          const XLSX = await import('xlsx').catch(() => null);
+          if (!XLSX) throw new Error('xlsx not available');
           const wb = XLSX.read(buffer, { type: 'array' });
           const sheetName = wb.SheetNames[0];
           const ws = wb.Sheets[sheetName];
@@ -145,7 +146,7 @@ export default function Home() {
 
       <header className="site-header">
         <div className="flex items-center gap-2">
-          <Image src="/Eagles.png" alt="Ashland Eagle Logo" width={60} height={60} className="w-10 h-10 object-contain" />
+          <Image src="/Eagles.png" alt="Ashland Eagle Logo" width={90} height={90} className="w-20 h-20 object-contain" />
           <h1 className="title">Ashland University Esports</h1>
         </div>
         <nav className="nav-buttons">
