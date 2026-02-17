@@ -29,6 +29,77 @@ export default function Home() {
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
+  const [matches, setMatches] = useState<any[]>([]);
+  useEffect(() => {
+    // Try to load an Excel file first, fall back to JSON
+    const tryLoad = async () => {
+      try {
+        const resX = await fetch('/data/matches.xlsx');
+        if (resX.ok) {
+          const buffer = await resX.arrayBuffer();
+          const XLSX = await import('xlsx');
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const sheetName = wb.SheetNames[0];
+          const ws = wb.Sheets[sheetName];
+          const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (Array.isArray(raw) && raw.length) {
+            // Normalize fields if necessary
+            const parsed = raw.map((r: any, i: number) => ({
+              id: r.id ?? i + 1,
+              ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
+              opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
+              game: r.game ?? r.Game ?? r.Platform ?? '',
+              time: r.time ?? r.Time ?? r.datetime ?? ''
+            }));
+            setMatches(parsed);
+            return;
+          }
+        }
+      } catch (e) {
+        // ignore and try JSON
+      }
+
+      // If xlsx not present or failed, try CSV then JSON
+      try {
+        const resC = await fetch('/data/matches.csv');
+        if (resC.ok) {
+          const txt = await resC.text();
+          const rows = txt.trim().split('\n').map((r) => r.split(','));
+          const headers = rows.shift() || [];
+          const parsed = rows.map((cols, i) => {
+            const obj: any = {};
+            headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
+            return {
+              id: Number(obj.id) || i + 1,
+              ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
+              opponent: obj.opponent || obj.Opponent || '',
+              game: obj.game || obj.Game || '',
+              time: obj.time || obj.Time || ''
+            };
+          });
+          if (parsed.length) { setMatches(parsed); return; }
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        const r = await fetch('/data/matches.json');
+        if (!r.ok) throw new Error('failed');
+        const data = await r.json();
+        if (Array.isArray(data) && data.length) setMatches(data);
+      } catch (e) {
+        // keep fallback
+      }
+    };
+    tryLoad();
+  }, []);
+
+  const [matchStart, setMatchStart] = useState(0);
+  const matchesToShow = 5;
+  const prevMatches = () => setMatchStart((s) => Math.max(0, s - 1));
+  const nextMatches = () => setMatchStart((s) => Math.min(Math.max(0, matches.length - matchesToShow), s + 1));
+
   const prev = () => {
     setCurrentConfIndex((prevIndex) => (prevIndex === 0 ? displayConferences.length - 1 : prevIndex - 1));
   };
@@ -53,13 +124,31 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-hscreen bg-white text-black">
-      <header className="w-full bg-[#5C068C] text-white px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <Image src="/Eagle.png" alt="Ashland Eagle Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <h1 className="text-2xl font-Gotham-Bold">Ashland Esports</h1>
+    <div className="min-hscreen bg-black text-white">
+      <div className="match-bar">
+        <button className="match-arrow" onClick={prevMatches} aria-label="Previous matches" disabled={matchStart === 0}>&larr;</button>
+        <div className="match-list">
+          {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
+            <div className="match-item" key={m.id}>
+              <div className="match-teams">
+                <span className="team-name">{m.ourTeam}</span>
+                <span className="versus">vs</span>
+                <span className="team-opponent">{m.opponent}</span>
+              </div>
+              <div className="match-game">{m.game}</div>
+              <div className="match-time">{m.time}</div>
+            </div>
+          ))}
         </div>
-        <nav className="flex gap-6">
+        <button className="match-arrow" onClick={nextMatches} aria-label="Next matches" disabled={matchStart >= matches.length - matchesToShow}>&rarr;</button>
+      </div>
+
+      <header className="site-header">
+        <div className="flex items-center gap-2">
+          <Image src="/Eagles.png" alt="Ashland Eagle Logo" width={60} height={60} className="w-10 h-10 object-contain" />
+          <h1 className="title">Ashland University Esports</h1>
+        </div>
+        <nav className="nav-buttons">
           {pages.map((page) => (
             <button key={page} className="hover:underline">
               {page}
@@ -69,21 +158,21 @@ export default function Home() {
       </header>
 
       <main className="flex justify-between items-start px-10 py-10 gap-6">
-        <aside className="w-[20%] flex flex-col items-center text-black">
+        <aside className="leagues-aside">
           <div className="text-xl mb-4">Leagues</div>
 
           <div className="w-full flex flex-col items-center gap-2">
 
-            <div className="overflow-hidden w-full h-[36rem] bg-[#FFC72C] rounded-lg">
+            <div className="league-carousel">
               <div
-                className="transition-transform duration-700 relative"
+                className="carousel-track"
                 style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
               >
                 {displayConferences.map((conf, idx) => (
                   <div
                     key={`${conf}-${idx}`}
                     onClick={() => setSelectedConf(conferences[idx % conferences.length])}
-                    className={`w-full h-48 flex flex-col items-center justify-center text-lg cursor-pointer transition-colors duration-200 hover:bg-[#5C068C] ${selectedConf === conf ? 'bg-[#5C068C] text-white font-semibold' : ''}`}
+                    className={`league-card ${selectedConf === conf ? 'selected' : ''}`}
                   >
                     <span className="mb-3 text-black text-lg font-Gotham-Bold">{conf}</span>
                     <Image src={displayImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
@@ -94,21 +183,37 @@ export default function Home() {
           </div>
         </aside>
 
-        <div className="w-[60%] h-[500px] border-2 border-gray-700 rounded-lg overflow-hidden">
-          <video
-            src="/AshlandEsports.mp4"
-            autoPlay
-            loop
-            muted
-            className="w-full h-full object-cover rounded-lg"
-          />
+        <div className="main-content">
+          <div className="video-container">
+            <video
+              src="/AshlandEsports.mp4"
+              autoPlay
+              loop
+              muted
+              className="w-full h-full object-cover rounded-lg"
+            />
+          </div>
+          <div className="jersey-box">
+            <h2>Get Your Jersey</h2>
+            <p>Show your support for Ashland Esports</p>
+            <a
+              href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
+              className="shop-btn"
+            >
+              Shop Now
+            </a>
+
+            <a
+              href="https://theinfiniteinc.com/blogs/news/ashland-e-sports?_pos=1&_sid=aa089622d&_ss=r"
+              className="shop-btn-alt"
+            >
+              Shop Now
+            </a>
+          </div>
         </div>
 
-        <div className="w-[20%] h-[650px]">
-          <iframe
-            src=""
-            className="w-full h-full px-4 py-2 border-2 border-gray-700 rounded-lg"
-          />
+        <div className="iframe-container">
+          <iframe src="" />
         </div>
       </main>
     </div>

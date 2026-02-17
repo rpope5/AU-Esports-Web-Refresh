@@ -1,0 +1,8 @@
+[
+  { "id": 1, "ourTeam": "Ashland", "opponent": "Kent State", "game": "League of Legends", "time": "2026-02-18T19:00:00Z" },
+  { "id": 2, "ourTeam": "Ashland", "opponent": "Ohio", "game": "Valorant", "time": "2026-02-18T20:30:00Z" },
+  { "id": 3, "ourTeam": "Ashland", "opponent": "Bowling Green", "game": "Overwatch", "time": "2026-02-19T18:00:00Z" },
+  { "id": 4, "ourTeam": "Ashland", "opponent": "Miami", "game": "Rocket League", "time": "2026-02-20T17:00:00Z" },
+  { "id": 5, "ourTeam": "Ashland", "opponent": "Toledo", "game": "CS2", "time": "2026-02-21T19:00:00Z" },
+  { "id": 6, "ourTeam": "Ashland", "opponent": "Akron", "game": "Smash", "time": "2026-02-22T15:00:00Z" }
+]

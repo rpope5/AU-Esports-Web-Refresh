@@ -24,3 +24,177 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Shared design tokens and utility classes for site-wide use */
+.site-header {
+  width: 100%;
+  background: #5C068C;
+  color: #ffffff;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.site-header .title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.nav-buttons {
+  display: flex;
+  gap: 1.5rem;
+}
+.nav-buttons button {
+  background: transparent;
+  color: inherit;
+  border: none;
+  cursor: pointer;
+}
+.nav-buttons button:hover {
+  text-decoration: underline;
+}
+
+.leagues-aside {
+  width: 20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #FFC72C;
+}
+.league-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.league-carousel {
+  overflow: hidden;
+  width: 100%;
+  height: 36rem;
+  background: #FFC72C;
+  border-radius: 0.5rem;
+}
+.carousel-track {
+  transition: transform 0.7s;
+  position: relative;
+}
+.league-card {
+  width: 100%;
+  height: 12rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.league-card:hover {
+  background: #5C068C;
+  color: white;
+}
+.league-card.selected {
+  background: #5C068C;
+  color: white;
+  font-weight: 600;
+}
+
+.main-content {
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.video-container {
+  height: 500px;
+  border: 2px solid #4b5563;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem;
+}
+
+.jersey-box {
+  background: #5C068C;
+  color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.jersey-box h2 { font-size: 1.125rem; font-weight: 700; }
+.jersey-box p { text-align: center; font-size: 0.875rem; }
+
+.shop-btn {
+  background: #FFC72C;
+  color: #000000;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.2s, color 0.2s;
+}
+.shop-btn:hover { background: #000000; color: #FFC72C; }
+
+.shop-btn-alt {
+  background: #ffffff;
+  color: #000000;
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.2s;
+}
+.shop-btn-alt:hover { background: #e5e7eb; }
+
+.iframe-container { width: 20%; height: 725px; }
+.iframe-container iframe { width: 100%; height: 100%; padding: 0.5rem; border: 2px solid #4b5563; border-radius: 0.5rem; }
+
+/* Top match bar shown above the main header */
+.match-bar {
+  width: 100%;
+  background: #0b0b0b;
+  color: #FFC72C;
+  padding: 0.35rem 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.95rem;
+}
+.match-bar-inner { display: flex; gap: 0.75rem; align-items: center; }
+.match-bar .match-link { color: #ffffff; margin-left: 0.5rem; text-decoration: underline; }
+
+/* Match list styles */
+.match-list { display:flex; gap:1rem; align-items:center; }
+.match-item {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:0.25rem 0.75rem;
+  border-radius:0.25rem;
+  min-width:12rem;
+  text-align:center;
+  color: #FFC72C;
+}
+.match-item .match-teams { font-weight:700; color:#ffffff; }
+.match-item .versus { margin: 0 0.25rem; color:#FFC72C; font-weight:600; }
+.match-item .match-game { font-size:0.9rem; color:#d1d5db; }
+.match-item .match-time { font-size:0.8rem; color:#9ca3af; }
+
+.match-arrow {
+  background: transparent;
+  border: none;
+  color: #FFC72C;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+.match-arrow:disabled { opacity: 0.4; cursor: default; }
