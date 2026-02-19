@@ -5,15 +5,16 @@ import Link from 'next/link'
 
 export default function Home() {
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
-  const pageMap: Record<string, string> = {
-    Home: '/',
-    Roster: '/roster',
-    Schedule: '/schedule',
-    News: '/news',
-    Stream: '/stream',
-    Recruitment: '/recruit',
-    Facility: '/facility',
-    Support: '/support',
+
+  const pageMap: { [key: string]: string } = {
+    "Home": "/",
+    "Roster": "/roster",
+    "Schedule": "/schedule",
+    "News": "/news",
+    "Stream": "/stream",
+    "Recruitment": "/recruit",
+    "Facility": "/facility",
+    "Support": "/support"
   };
 
   const conferences = [
@@ -168,65 +169,6 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="flex justify-between items-start px-10 py-10 gap-6">
-        <aside className="leagues-aside">
-          <div className="text-xl mb-4">Leagues</div>
-
-          <div className="w-full flex flex-col items-center gap-2">
-
-            <div className="league-carousel">
-              <div
-                className="carousel-track"
-                style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
-              >
-                {displayConferences.map((conf, idx) => (
-                  <div
-                    key={`${conf}-${idx}`}
-                    onClick={() => setSelectedConf(conferences[idx % conferences.length])}
-                    className={`league-card ${selectedConf === conf ? 'selected' : ''}`}
-                  >
-                    <span className="mb-3 text-black text-lg font-Gotham-Bold">{conf}</span>
-                    <Image src={displayImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <div className="main-content">
-          <div className="video-container">
-            <video
-              src="/AshlandEsports.mp4"
-              autoPlay
-              loop
-              muted
-              className="w-full h-full object-cover rounded-lg"
-            />
-          </div>
-          <div className="jersey-box">
-            <h2>Get Your Jersey</h2>
-            <p>Show your support for Ashland Esports</p>
-            <a
-              href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
-              className="shop-btn"
-            >
-              Shop Now
-            </a>
-
-            <a
-              href="https://theinfiniteinc.com/blogs/news/ashland-e-sports?_pos=1&_sid=aa089622d&_ss=r"
-              className="shop-btn-alt"
-            >
-              Shop Now
-            </a>
-          </div>
-        </div>
-
-        <div className="iframe-container">
-          <iframe src="" />
-        </div>
-      </main>
     </div>
   );
 }
