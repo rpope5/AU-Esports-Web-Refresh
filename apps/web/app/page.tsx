@@ -197,7 +197,7 @@ export default function Home() {
         <div className="main-content">
           <div className="video-container">
             <video
-              src="/AshlandEsports.mp4"
+              src="/CS2.mp4"
               autoPlay
               loop
               muted
@@ -224,7 +224,7 @@ export default function Home() {
         </div>
 
         <div className="iframe-container">
-          <iframe src="" />
+          <iframe src="https://www.instagram.com/ashlandesports/" />
         </div>
       </main>
     </div>
