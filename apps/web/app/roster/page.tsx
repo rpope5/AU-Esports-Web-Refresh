@@ -2,6 +2,9 @@
 import { useState, useEffect } from "react";
 import Image from 'next/image'
 import Link from 'next/link'
+import { Player } from "@/types/Player";
+import RosterGrid from "@/components/RosterGrid";
+
 
 export default function Home() {
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
@@ -42,67 +45,74 @@ export default function Home() {
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   const [matches, setMatches] = useState<any[]>([]);
-  useEffect(() => {
+ const [players, setPlayers] = useState<Player[]>([]);
 
-    const tryLoad = async () => {
-      try {
-        const resX = await fetch('/data/matches.xlsx');
-        if (resX.ok) {
-          const buffer = await resX.arrayBuffer();
-          const XLSX = await import('xlsx' as any).catch(() => null);
-          if (!XLSX) throw new Error('xlsx not available');
-          const wb = XLSX.read(buffer, { type: 'array' });
-          const sheetName = wb.SheetNames[0];
-          const ws = wb.Sheets[sheetName];
-          const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          if (Array.isArray(raw) && raw.length) {
-            const parsed = raw.map((r: any, i: number) => ({
-              id: r.id ?? i + 1,
-              ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
-              opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
-              game: r.game ?? r.Game ?? r.Platform ?? '',
-              time: r.time ?? r.Time ?? r.datetime ?? ''
-            }));
-            setMatches(parsed);
-            return;
-          }
+  // Load roster
+useEffect(() => {
+  fetch("/data/roster.json")
+    .then((res) => res.json())
+    .then((data) => setPlayers(data))
+    .catch(() => console.error("Failed to load roster"));
+}, []);
+
+// Load matches
+useEffect(() => {
+  const tryLoad = async () => {
+    try {
+      const resX = await fetch('/data/matches.xlsx');
+      if (resX.ok) {
+        const buffer = await resX.arrayBuffer();
+        const XLSX = await import('xlsx' as any).catch(() => null);
+        if (!XLSX) throw new Error('xlsx not available');
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (Array.isArray(raw) && raw.length) {
+          const parsed = raw.map((r: any, i: number) => ({
+            id: r.id ?? i + 1,
+            ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
+            opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
+            game: r.game ?? r.Game ?? r.Platform ?? '',
+            time: r.time ?? r.Time ?? r.datetime ?? ''
+          }));
+          setMatches(parsed);
+          return;
         }
-      } catch (e) {
-      
       }
+    } catch (e) {}
 
-      try {
-        const resC = await fetch('/data/matches.csv');
-        if (resC.ok) {
-          const txt = await resC.text();
-          const rows = txt.trim().split('\n').map((r) => r.split(','));
-          const headers = rows.shift() || [];
-          const parsed = rows.map((cols, i) => {
-            const obj: any = {};
-            headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
-            return {
-              id: Number(obj.id) || i + 1,
-              ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
-              opponent: obj.opponent || obj.Opponent || '',
-              game: obj.game || obj.Game || '',
-              time: obj.time || obj.Time || ''
-            };
-          });
-          if (parsed.length) { setMatches(parsed); return; }
-        }
-      } catch (e) {
+    try {
+      const resC = await fetch('/data/matches.csv');
+      if (resC.ok) {
+        const txt = await resC.text();
+        const rows = txt.trim().split('\n').map((r) => r.split(','));
+        const headers = rows.shift() || [];
+        const parsed = rows.map((cols, i) => {
+          const obj: any = {};
+          headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
+          return {
+            id: Number(obj.id) || i + 1,
+            ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
+            opponent: obj.opponent || obj.Opponent || '',
+            game: obj.game || obj.Game || '',
+            time: obj.time || obj.Time || ''
+          };
+        });
+        if (parsed.length) { setMatches(parsed); return; }
       }
+    } catch (e) {}
 
-      try {
-        const r = await fetch('/data/matches.json');
-        if (!r.ok) throw new Error('failed');
-        const data = await r.json();
-        if (Array.isArray(data) && data.length) setMatches(data);
-      } catch (e) {
-      }
-    };
-    tryLoad();
-  }, []);
+    try {
+      const r = await fetch('/data/matches.json');
+      if (!r.ok) throw new Error('failed');
+      const data = await r.json();
+      if (Array.isArray(data) && data.length) setMatches(data);
+    } catch (e) {}
+  };
+
+  tryLoad();
+}, []);
 
   const [matchStart, setMatchStart] = useState(0);
   const matchesToShow = 5;
@@ -168,6 +178,8 @@ export default function Home() {
           })}
         </nav>
       </header>
+          <div className="text-4xl py-8 text-center font-Gotham-Bold">Team Roster</div>
+          <RosterGrid players={players} />
 
     </div>
   );
