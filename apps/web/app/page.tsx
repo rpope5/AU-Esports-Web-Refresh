@@ -25,8 +25,8 @@ export default function Home() {
     "CCL"
   ];
   const conferenceImages = [
-    '/ECAC.jpg',
-    '/GLEC.jpg',
+    '/ECAC.png',
+    '/GLEC.png',
     '/NECC.jpg',
     '/CKL.png',
     '/PlayVS.jpg',
@@ -204,25 +204,35 @@ export default function Home() {
               className="w-full h-full object-cover rounded-lg"
             />
           </div>
-          <div className="jersey-box">
-            <h2>Get Your Jersey</h2>
-            <p>Show your support for Ashland Esports</p>
-            <a
-              href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
-              className="shop-btn"
-            >
-              Shop Now
-            </a>
+<div className="jersey-box">
+  <h2>Get Your Jersey</h2>
+  <p>Show your support for Ashland Esports</p>
 
-            <a
-              href="https://theinfiniteinc.com/blogs/news/ashland-e-sports?_pos=1&_sid=aa089622d&_ss=r"
-              className="shop-btn-alt"
-            >
-              Shop Now
-            </a>
-          </div>
-        </div>
+  <div className="flex justify-between items-center mt-4">
+    <a
+      href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
+      className="shop-btn"
+    >
+      <img
+        src="/crit.png"
+        alt="Crit Apparel Logo"
+        className="w-40 h-auto object-contain"
+      />
+    </a>
 
+    <a
+      href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
+      className="shop-btn-alt"
+    >
+      <img
+        src="/infinite.png"
+        alt="Infinite Logo"
+        className="w-40 h-auto object-contain"
+      />
+    </a>
+  </div>
+</div>
+</div>
         <div className="iframe-container">
           <iframe src="https://www.instagram.com/ashlandesports/" />
         </div>
