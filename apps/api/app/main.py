@@ -8,12 +8,14 @@ from app.db.session import engine
 from app.v1.endpoints import recruits_public
 from app.v1.endpoints import auth_internal
 from app.v1.endpoints import admin_test
+from app.v1.endpoints import recruits_admin
 
 app = FastAPI(title="AU Esports Platform API")
 
 app.include_router(recruits_public.router, prefix="/api/v1")
 app.include_router(auth_internal.router, prefix="/api/v1")
 app.include_router(admin_test.router, prefix="/api/v1")
+app.include_router(recruits_admin.router, prefix="/api/v1")
 
 Base.metadata.create_all(bind=engine)
 

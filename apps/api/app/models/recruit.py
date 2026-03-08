@@ -67,4 +67,14 @@ class RecruitRanking(Base):
     explanation_json = Column(JSON)
     model_version = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+class RecruitReview(Base):
+    __tablename__ = "recruit_reviews"
+
+    id = Column(Integer, primary_key=True)
+    application_id = Column(Integer, ForeignKey("recruit_applications.id"))
+    status = Column(String, default="NEW")
+    reviewer_user_id = Column(Integer, nullable=True)
+    notes = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
