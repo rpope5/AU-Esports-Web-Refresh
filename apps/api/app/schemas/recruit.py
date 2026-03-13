@@ -1,12 +1,14 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
+
 
 class AvailabilityInput(BaseModel):
     hours_per_week: int
     weeknights_available: bool
     weekends_available: bool
 
-class ValorantProfileInput(BaseModel):
+
+class RecruitProfileInput(BaseModel):
     ign: str
     current_rank_label: str
     peak_rank_label: Optional[str] = None
@@ -16,6 +18,7 @@ class ValorantProfileInput(BaseModel):
     team_experience: bool
     scrim_experience: bool
     tournament_experience: str
+
 
 class RecruitApplyInput(BaseModel):
     first_name: str
@@ -27,4 +30,5 @@ class RecruitApplyInput(BaseModel):
     preferred_contact: Optional[str] = None
 
     availability: AvailabilityInput
-    valorant_profile: ValorantProfileInput
+    game_slug: Literal["valorant", "cs2"]
+    profile: RecruitProfileInput

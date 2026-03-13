@@ -11,6 +11,8 @@ from app.models.recruit import (
     RecruitRanking,
     RecruitReview,
 )
+from app.schemas.admin import RecruitStatusUpdate, RecruitNotesUpdate
+from datetime import datetime
 
 router = APIRouter()
 
@@ -187,3 +189,61 @@ def get_recruit_detail(
             "notes": review.notes if review else None,
         },
     }
+    
+@router.patch("/admin/recruit/{application_id}/status")
+def update_recruit_status(
+    application_id: int,
+    data: RecruitStatusUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    review = (
+        db.query(RecruitReview)
+        .filter(RecruitReview.application_id == application_id)
+        .first()
+    )
+
+    if not review:
+        review = RecruitReview(
+            application_id=application_id,
+            status=data.status.upper(),
+            reviewer_user_id=None,
+            notes=None,
+            updated_at=datetime.utcnow(),
+        )
+        db.add(review)
+    else:
+        review.status = data.status.upper()
+        review.updated_at = datetime.utcnow()
+
+    db.commit()
+    return {"message": "Status updated", "status": review.status}
+
+@router.patch("/admin/recruit/{application_id}/notes")
+def update_recruit_notes(
+    application_id: int,
+    data: RecruitNotesUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    review = (
+        db.query(RecruitReview)
+        .filter(RecruitReview.application_id == application_id)
+        .first()
+    )
+
+    if not review:
+        review = RecruitReview(
+            application_id=application_id,
+            status="NEW",
+            reviewer_user_id=None,
+            notes=data.notes,
+            updated_at=datetime.utcnow(),
+        )
+        db.add(review)
+    else:
+        review.notes = data.notes
+        review.updated_at = datetime.utcnow()
+
+    db.commit()
+    return {"message": "Notes updated", "notes": review.notes}
