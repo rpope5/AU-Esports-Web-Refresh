@@ -132,6 +132,10 @@ body {
 .jersey-box p { text-align: center; font-size: 0.875rem; }
 
 
+.title-3d {
+  color: white;
+  text-shadow: 1px 1px #333, 2px 2px #FFC72C;
+}
 
 
 .iframe-container { width: 20%; height: 725px; }

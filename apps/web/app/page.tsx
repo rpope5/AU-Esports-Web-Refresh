@@ -39,7 +39,7 @@ export default function Home() {
   
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
-
+  const [isLive, setIsLive] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
   useEffect(() => {
 
@@ -122,7 +122,17 @@ export default function Home() {
       setCurrentConfIndex(0);
     }
   }, [currentConfIndex]);
-
+ useEffect(() => {
+  const checkLiveStatus = async () => {
+  try { const res = await fetch( "https://decapi.me/twitch/uptime/ashlandesports" ); 
+    const text = await res.text(); 
+    if (text.includes("offline")) { 
+      setIsLive(false); } 
+      else { setIsLive(true); } 
+    } catch (error) { setIsLive(false); } }
+    ; checkLiveStatus(); 
+    const interval = setInterval(checkLiveStatus, 60000); 
+    return () => clearInterval(interval); }, []);
  
   useEffect(() => {
     const id = setInterval(() => {
@@ -151,23 +161,58 @@ export default function Home() {
         <button className="match-arrow" onClick={nextMatches} aria-label="Next matches" disabled={matchStart >= matches.length - matchesToShow}>&rarr;</button>
       </div>
 
-      <header className="site-header">
+      <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
+
         <div className="flex items-center gap-2">
-          <Image src="/Eagles (2).png" alt="Ashland Eagle Logo" width={90} height={90} className="w-20 h-20 object-contain" />
-          <h1 className="title">Ashland University Esports</h1>
+
+          <Image
+            src="/Eagles (2).png"
+            alt="Ashland Eagle Logo"
+            width={90}
+            height={90}
+            className="w-14 h-14 md:w-20 md:h-20 object-contain"
+          />
+
+          <div className="flex items-center gap-3">
+
+            <h1
+  className="title title-3d text-lg md:text-2xl font-bold tracking-wide"
+  style={{ textShadow: "1px 1px #333, 2px 2px #FFC72C" }}
+>
+  Ashland University Esports
+</h1>
+
+            {isLive && (
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFC72C] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#FFC72C]"></span>
+                </span>
+
+                <span className="text-[#FFC72C] text-sm font-semibold">
+                  LIVE
+                </span>
+              </div>
+            )}
+
+          </div>
         </div>
-        <nav className="nav-buttons">
+
+        <nav className="nav-buttons flex flex-wrap justify-center gap-6 text-sm md:text-base">
           {pages.map((page) => {
-            const href = pageMap[page] || '/';
+            const href = pageMap[page] || "/";
+
             return (
-              <Link key={page} href={href} className="hover:underline">
+              <Link key={page} href={href} className="relative group">
                 {page}
+                <span className="absolute left-0 -bottom-1 w-0 h-[2px] bg-[#FFC72C] transition-all duration-300 group-hover:w-full"></span>
               </Link>
             );
           })}
         </nav>
-      </header>
 
+      </header>
+ <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
       <main className="flex justify-between items-start px-10 py-10 gap-6">
         <aside className="leagues-aside">
           <div className="text-xl mb-4">Leagues</div>
