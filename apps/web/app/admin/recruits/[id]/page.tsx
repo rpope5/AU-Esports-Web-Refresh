@@ -100,7 +100,7 @@ async function saveNotes() {
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <h2 className="text-lg font-medium">Valorant Profile</h2>
+        <h2 className="text-lg font-medium">Profile</h2>
         <div className="mt-3 space-y-2 text-sm">
           <p>IGN: {profile?.ign}</p>
           <p>Current Rank: {profile?.current_rank_label}</p>

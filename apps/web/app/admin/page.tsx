@@ -1,7 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+const gameCards = [
+  {
+    name: "Valorant",
+    href: "/admin/recruits/valorant",
+    description: "View and manage Valorant recruits",
+  },
+  {
+    name: "CS2",
+    href: "/admin/recruits/cs2",
+    description: "View and manage Counter-Strike 2 recruits",
+  },
+  {
+    name: "Fortnite",
+    href: "#",
+    description: "Coming soon",
+  },
+  {
+    name: "Rainbow Six Siege",
+    href: "#",
+    description: "Coming soon",
+  },
+];
 
 export default function AdminHome() {
   const router = useRouter();
@@ -32,16 +56,53 @@ export default function AdminHome() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold">Admin Portal</h1>
-      {me ? (
-        <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <div className="text-sm text-neutral-400">Signed in as</div>
-          <div className="mt-1 font-mono">{me.email || me.username}</div>
-          <div className="mt-1 text-sm">Role: {me.role}</div>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Admin Portal</h1>
+          {me ? (
+            <p className="mt-1 text-sm text-neutral-400">
+              Signed in as {me.username} • {me.role}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-neutral-400">Loading session...</p>
+          )}
         </div>
-      ) : (
-        <p className="mt-4 text-neutral-400">Loading...</p>
-      )}
+
+        <button
+          onClick={() => {
+            localStorage.removeItem("au_admin_token");
+            localStorage.removeItem("au_admin_role");
+            localStorage.removeItem("au_admin_username");
+            router.push("/admin/login");
+          }}
+          className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm hover:border-neutral-700"
+        >
+          Log Out
+        </button>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
+        {gameCards.map((game) =>
+          game.href === "#" ? (
+            <div
+              key={game.name}
+              className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 opacity-70"
+            >
+              <h2 className="text-xl font-medium">{game.name}</h2>
+              <p className="mt-2 text-sm text-neutral-400">{game.description}</p>
+            </div>
+          ) : (
+            <Link
+              key={game.name}
+              href={game.href}
+              className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 transition hover:border-neutral-700"
+            >
+              <h2 className="text-xl font-medium">{game.name}</h2>
+              <p className="mt-2 text-sm text-neutral-400">{game.description}</p>
+            </Link>
+          )
+        )}
+      </div>
     </div>
   );
 }
