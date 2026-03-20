@@ -18,6 +18,7 @@ class RecruitProfileInput(BaseModel):
     team_experience: bool
     scrim_experience: bool
     tournament_experience: str
+    fortnite_mode: str | None = None
 
 
 class RecruitApplyInput(BaseModel):
@@ -30,5 +31,5 @@ class RecruitApplyInput(BaseModel):
     preferred_contact: Optional[str] = None
 
     availability: AvailabilityInput
-    game_slug: Literal["valorant", "cs2"]
+    game_slug: Literal["valorant", "cs2", "fortnite"]
     profile: RecruitProfileInput

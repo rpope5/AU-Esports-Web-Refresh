@@ -40,6 +40,7 @@ class RecruitGameProfile(Base):
     game_id = Column(Integer, ForeignKey("games.id"))
 
     ign = Column(String)
+    fortnite_mode = Column(String, nullable=True)
     current_rank_label = Column(String)
     current_rank_numeric = Column(Float)
     peak_rank_label = Column(String)

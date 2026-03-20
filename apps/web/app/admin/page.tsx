@@ -17,8 +17,8 @@ const gameCards = [
   },
   {
     name: "Fortnite",
-    href: "#",
-    description: "Coming soon",
+    href: "/admin/recruits/fortnite",
+    description: "View and manage Fortnite recruits",
   },
   {
     name: "Rainbow Six Siege",
