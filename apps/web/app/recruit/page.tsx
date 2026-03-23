@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2";
+type GameSlug = "valorant" | "cs2" | "fortnite";
 
 type FormState = {
   first_name: string;
@@ -18,6 +18,7 @@ type FormState = {
   weeknights_available: boolean;
   weekends_available: boolean;
   game_slug: GameSlug;
+  fortnite_mode: string;
   ign: string;
   current_rank_label: string;
   peak_rank_label: string;
@@ -77,6 +78,13 @@ const cs2Roles = [
   "Flex",
 ];
 
+const fortniteRoles = [
+  "IGL",
+  "Fragger",
+  "Support",
+  "Flex",
+];
+
 const valorantRanks = [
   "Iron 1",
   "Iron 2",
@@ -112,6 +120,17 @@ const cs2RankExamples = [
   "Global Elite",
 ];
 
+const fortniteRanks = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Elite",
+  "Champion",
+  "Unreal",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -127,6 +146,7 @@ export default function RecruitPage() {
     weeknights_available: true,
     weekends_available: false,
     game_slug: "valorant",
+    fortnite_mode: "",
     ign: "",
     current_rank_label: "",
     peak_rank_label: "",
@@ -147,8 +167,10 @@ export default function RecruitPage() {
   const matchesToShow = 5;
 
   const roleOptions = useMemo(() => {
-    return form.game_slug === "valorant" ? valorantRoles : cs2Roles;
-  }, [form.game_slug]);
+  if (form.game_slug === "valorant") return valorantRoles;
+  if (form.game_slug === "cs2") return cs2Roles;
+  return fortniteRoles;
+}, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -158,6 +180,7 @@ export default function RecruitPage() {
     setForm((prev) => ({
       ...prev,
       game_slug: game,
+      fortnite_mode: "",
       ign: "",
       current_rank_label: "",
       peak_rank_label: "",
@@ -275,6 +298,8 @@ export default function RecruitPage() {
         game_slug: form.game_slug,
         profile: {
           ign: form.ign,
+          fortnite_mode:
+            form.game_slug === "fortnite" ? form.fortnite_mode : null,
           current_rank_label: form.current_rank_label,
           peak_rank_label: form.peak_rank_label || null,
           primary_role: form.primary_role,
@@ -318,6 +343,7 @@ export default function RecruitPage() {
         hours_per_week: "",
         weeknights_available: true,
         weekends_available: false,
+        fortnite_mode: "",
         ign: "",
         current_rank_label: "",
         peak_rank_label: "",
@@ -511,10 +537,26 @@ export default function RecruitPage() {
               >
                 <option value="valorant">Valorant</option>
                 <option value="cs2">Counter-Strike 2</option>
+                <option value="fortnite">Fortnite</option>
               </select>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {form.game_slug === "fortnite" && (
+                <div>
+                  <label className="text-sm text-neutral-300">Fortnite Mode</label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.fortnite_mode}
+                    onChange={(e) => update("fortnite_mode", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a mode</option>
+                    <option value="builds">Builds</option>
+                    <option value="zero_builds">Zero Builds</option>
+                  </select>
+                </div>
+              )}
               <Input
                 label="In-Game Name"
                 value={form.ign}
@@ -536,6 +578,20 @@ export default function RecruitPage() {
                   >
                     <option value="">Select a rank</option>
                     {valorantRanks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
+                ) : form.game_slug === "fortnite" ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.current_rank_label}
+                    onChange={(e) => update("current_rank_label", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a rank</option>
+                    {fortniteRanks.map((rank) => (
                       <option key={rank} value={rank}>
                         {rank}
                       </option>

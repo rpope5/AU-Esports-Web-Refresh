@@ -21,11 +21,12 @@ type Recruit = {
   status: string;
 };
 
-export default function ValorantRecruitListPage() {
+export default function CS2RecruitListPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [recruits, setRecruits] = useState<Recruit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -35,7 +36,7 @@ export default function ValorantRecruitListPage() {
     }
 
     (async () => {
-      const res = await fetch(`${apiUrl}/api/v1/admin/recruits/game/valorant`, {
+      const res = await fetch(`${apiUrl}/api/v1/admin/recruits/game/cs2`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,7 +50,8 @@ export default function ValorantRecruitListPage() {
 
       if (!res.ok) {
         const text = await res.text();
-        console.error("Failed to load recruits:", res.status, text);
+        console.error("Failed to load CS2 recruits:", res.status, text);
+        setErr(`Failed to load recruits (${res.status})`);
         setLoading(false);
         return;
       }
@@ -64,9 +66,9 @@ export default function ValorantRecruitListPage() {
     <div className="p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Valorant Recruits</h1>
+          <h1 className="text-2xl font-semibold">CS2 Recruits</h1>
           <p className="mt-1 text-sm text-neutral-400">
-            Review Valorant applicants and rankings.
+            Review Counter-Strike 2 applicants and rankings.
           </p>
         </div>
 
@@ -77,10 +79,11 @@ export default function ValorantRecruitListPage() {
           Back to Admin
         </Link>
       </div>
-      
 
       {loading ? (
         <p className="mt-4 text-neutral-400">Loading...</p>
+      ) : err ? (
+        <p className="mt-4 text-red-400">{err}</p>
       ) : recruits.length === 0 ? (
         <p className="mt-4 text-neutral-400">No recruits yet.</p>
       ) : (

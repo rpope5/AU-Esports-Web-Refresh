@@ -177,7 +177,7 @@ export default function Home() {
 
             <h1
   className="title title-3d text-lg md:text-2xl font-bold tracking-wide"
-  style={{ textShadow: "1px 1px #333, 2px 2px #FFC72C" }}
+  style={{ textShadow: "1px 1px #333"}}
 >
   Ashland University Esports
 </h1>

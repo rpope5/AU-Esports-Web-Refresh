@@ -21,6 +21,11 @@ from app.services.scoring.cs2 import (
     score_cs2,
     CS2Inputs,
 )
+from app.services.scoring.fortnite import (
+    fortnite_rank_to_numeric,
+    score_fortnite,
+    FortniteInputs,
+)
 
 router = APIRouter()
 
@@ -112,6 +117,30 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         )
         score, explanation = score_cs2(inputs)
         model_version = "v1_cs2"
+        
+    elif data.game_slug == "fortnite":
+        rank_numeric = fortnite_rank_to_numeric(data.profile.current_rank_label)
+        peak_rank_numeric = (
+            fortnite_rank_to_numeric(data.profile.peak_rank_label)
+            if data.profile.peak_rank_label
+            else None
+        )
+
+        inputs = FortniteInputs(
+            rank_numeric=rank_numeric,
+            hours_per_week=data.availability.hours_per_week,
+            weeknights_available=data.availability.weeknights_available,
+            weekends_available=data.availability.weekends_available,
+            team_experience=data.profile.team_experience,
+            scrim_experience=data.profile.scrim_experience,
+            tournament_experience=data.profile.tournament_experience,
+            tracker_url_present=bool(data.profile.tracker_url),
+            ign_present=bool(data.profile.ign),
+            roles_present=bool(data.profile.primary_role),
+            peak_rank_present=bool(data.profile.peak_rank_label),
+        )
+        score, explanation = score_fortnite(inputs)
+        model_version = "v1_fortnite"
 
     else:
         raise HTTPException(status_code=400, detail="Unsupported game")
@@ -131,6 +160,7 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         team_experience=data.profile.team_experience,
         scrim_experience=data.profile.scrim_experience,
         tournament_experience=data.profile.tournament_experience,
+        fortnite_mode=data.profile.fortnite_mode,
     )
 
     db.add(profile)
