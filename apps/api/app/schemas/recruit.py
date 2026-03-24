@@ -31,5 +31,5 @@ class RecruitApplyInput(BaseModel):
     preferred_contact: Optional[str] = None
 
     availability: AvailabilityInput
-    game_slug: Literal["valorant", "cs2", "fortnite"]
+    game_slug: Literal["valorant", "cs2", "fortnite", "r6"]
     profile: RecruitProfileInput
