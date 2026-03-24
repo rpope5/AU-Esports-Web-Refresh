@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod";
 
 type FormState = {
   first_name: string;
@@ -110,6 +110,15 @@ const overwatchRoles = [
   "Flex",
 ];
 
+const codRoles = [
+  "SMG",
+  "AR",
+  "Flex",
+  "Main AR",
+  "OBJ",
+  "Slayer",
+];
+
 const valorantRanks = [
   "Iron 1",
   "Iron 2",
@@ -189,6 +198,17 @@ const overwatchRanks = [
   "Top 500",
 ];
 
+const codRanks = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Crimson",
+  "Iridescent",
+  "Top 250",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -230,7 +250,8 @@ export default function RecruitPage() {
   if (form.game_slug === "fortnite") return fortniteRoles;
   if (form.game_slug === "r6") return r6Roles;
   if (form.game_slug === "rocket-league") return rocketLeagueRoles;
-  return overwatchRoles;
+  if (form.game_slug === "overwatch") return overwatchRoles;
+  return codRoles;
 }, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -656,6 +677,7 @@ const [isLive, setIsLive] = useState(false);
                 <option value="r6">Rainbow Six Siege</option>
                 <option value="rocket-league">Rocket League</option>
                 <option value="overwatch">Overwatch</option>
+                <option value="cod">Call of Duty</option>
               </select>
             </div>
 
@@ -759,6 +781,21 @@ const [isLive, setIsLive] = useState(false);
                         </option>
                       ))}
                     </select>
+
+                ) : form.game_slug === "cod" ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.current_rank_label}
+                    onChange={(e) => update("current_rank_label", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a rank</option>
+                    {codRanks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <>
                     <input
