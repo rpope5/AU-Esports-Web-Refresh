@@ -41,7 +41,8 @@ class RecruitApplyInput(BaseModel):
         "fortnite",
         "r6",
         "rocket-league",
-        "overwatch"
+        "overwatch",
+        "cod",
     ]
     profile: RecruitProfileInput
 
