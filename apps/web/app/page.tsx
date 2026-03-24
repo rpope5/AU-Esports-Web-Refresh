@@ -28,7 +28,7 @@ export default function Home() {
   const [isLive, setIsLive] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
 
-  // Load matches JSON
+ 
   useEffect(() => {
     const tryLoad = async () => {
       try {
@@ -41,7 +41,7 @@ export default function Home() {
     tryLoad();
   }, []);
 
-  // Twitch live check
+  
   useEffect(() => {
     const checkLiveStatus = async () => {
       try {
@@ -57,13 +57,17 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // League carousel auto-scroll
+  
   useEffect(() => {
-    const id = setInterval(() => setCurrentConfIndex(i => i + 1), 3000);
+    const id = setInterval(() => {
+      setCurrentConfIndex(prevIndex =>
+        (prevIndex + 1) % displayConferences.length
+      );
+    }, 3000);
     return () => clearInterval(id);
-  }, []);
+  }, [displayConferences.length]);
 
-  // Load Twitter embed script only on client
+
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://platform.twitter.com/widgets.js";
@@ -76,12 +80,12 @@ export default function Home() {
   const prevMatches = () => setMatchStart(s => Math.max(0, s - 1));
   const nextMatches = () => setMatchStart(s => Math.min(Math.max(0, matches.length - matchesToShow), s + 1));
   const prev = () => setCurrentConfIndex(prevIndex => (prevIndex === 0 ? displayConferences.length - 1 : prevIndex - 1));
-  const next = () => setCurrentConfIndex(prevIndex => prevIndex + 1);
+  const next = () => setCurrentConfIndex(prevIndex => (prevIndex + 1) % displayConferences.length);
 
   return (
-    <div className="min-hscreen bg-black text-white">
+    <div className="min-h-screen bg-black text-white"> 
 
-      {/* Match bar */}
+      
       <div className="match-bar">
         <button className="match-arrow" onClick={prevMatches} disabled={matchStart === 0}>&larr;</button>
         <div className="match-list">
@@ -100,7 +104,7 @@ export default function Home() {
         <button className="match-arrow" onClick={nextMatches} disabled={matchStart >= matches.length - matchesToShow}>&rarr;</button>
       </div>
 
-      {/* Header */}
+      
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
         <div className="flex items-center gap-2">
           <Image src="/Eagles (2).png" alt="Ashland Eagle Logo" width={90} height={90} className="w-14 h-14 md:w-20 md:h-20 object-contain" />
@@ -132,17 +136,24 @@ export default function Home() {
 
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
 
-      {/* Main content */}
+      
       <main className="flex justify-between items-start px-10 py-10 gap-6">
 
-        {/* League carousel */}
+        
         <aside className="leagues-aside">
           <div className="text-xl mb-4">Leagues</div>
           <div className="w-full flex flex-col items-center gap-2">
-            <div className="league-carousel">
-              <div className="carousel-track" style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}>
+            <div className="league-carousel overflow-hidden h-48"> 
+              <div
+                className="carousel-track"
+                style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
+              >
                 {displayConferences.map((conf, idx) => (
-                  <div key={`${conf}-${idx}`} onClick={() => setSelectedConf(conferences[idx % conferences.length])} className={`league-card ${selectedConf === conf ? 'selected' : ''}`}>
+                  <div
+                    key={`${conf}-${idx}`}
+                    onClick={() => setSelectedConf(conferences[idx % conferences.length])}
+                    className={`league-card h-48 ${selectedConf === conf ? 'selected' : ''}`}
+                  >
                     <span className="mb-3 text-black text-lg font-Gotham-Bold">{conf}</span>
                     <Image src={displayImages[idx]} alt={`${conf} logo`} width={112} height={112} className="w-28 h-28 object-contain" />
                   </div>
@@ -152,7 +163,7 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* Video + Jersey */}
+        
         <div className="main-content">
           <div className="video-container">
             <video src="/CS2.mp4" autoPlay loop muted className="w-full h-full object-cover rounded-lg" />
@@ -173,14 +184,14 @@ export default function Home() {
         </div>
 
         <div className="twitter-box h-[500px] w-[250px] border-2 border-gray-700 rounded-md overflow-hidden text-center">
-  <a
-    className="twitter-timeline"
-    data-theme="dark"
-    href="https://twitter.com/AshlandEsports?ref_src=twsrc%5Etfw"
-  >
-    Tweets by AshlandEsports
-  </a>
-</div>
+          <a
+            className="twitter-timeline"
+            data-theme="dark"
+            href="https://twitter.com/AshlandEsports?ref_src=twsrc%5Etfw"
+          >
+            Tweets by AshlandEsports
+          </a>
+        </div>
       </main>
     </div>
   );
