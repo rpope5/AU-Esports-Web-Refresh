@@ -38,6 +38,8 @@ type Match = {
   time: string;
 };
 
+const graduationYears = Array.from({ length: 7 }, (_, i) => String(new Date().getFullYear() + i));
+
 const pages = [
   "Home",
   "Roster",
@@ -526,6 +528,7 @@ const [isLive, setIsLive] = useState(false);
           <h2 className="text-3xl font-semibold">Recruitment</h2>
           <p className="mt-2 text-sm text-neutral-400">
             Submit your information to be considered for the AU Esports program.
+            We have opportunities for scholarships through our athletics department!
           </p>
         </div>
 
@@ -564,12 +567,21 @@ const [isLive, setIsLive] = useState(false);
                 value={form.current_school}
                 onChange={(v) => update("current_school", v)}
               />
-              <Input
-                label="Graduation Year"
-                value={form.graduation_year}
-                onChange={(v) => update("graduation_year", v)}
-              />
-
+              <div>
+                <label className="text-sm text-neutral-300">Graduation Year</label>
+                <select
+                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                  value={form.graduation_year}
+                  onChange={(e) => update("graduation_year", e.target.value)}
+                >
+                  <option value="">Select graduation year</option>
+                  {graduationYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="text-sm text-neutral-300">
                   Preferred Contact
@@ -595,6 +607,9 @@ const [isLive, setIsLive] = useState(false);
                 value={form.hours_per_week}
                 onChange={(v) => update("hours_per_week", v)}
                 required
+                type="number"
+                min={1}
+                max={40}
               />
 
               <div className="flex flex-col gap-3 pt-6">
@@ -882,12 +897,16 @@ function Input({
   onChange,
   required = false,
   type = "text",
+  min,
+  max,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   type?: string;
+  min?: number;
+  max?: number;
 }) {
   return (
     <div>
@@ -898,6 +917,8 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         type={type}
+        min={min}
+        max={max}
       />
     </div>
   );

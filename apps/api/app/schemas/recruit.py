@@ -1,35 +1,55 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Optional, Literal
+from datetime import datetime
+
+
+CURRENT_YEAR = datetime.now().year
 
 
 class AvailabilityInput(BaseModel):
-    hours_per_week: int
+    hours_per_week: int = Field(..., ge=1, le=40)
     weeknights_available: bool
     weekends_available: bool
 
 
 class RecruitProfileInput(BaseModel):
-    ign: str
-    current_rank_label: str
-    peak_rank_label: Optional[str] = None
-    primary_role: str
-    secondary_role: Optional[str] = None
-    tracker_url: Optional[str] = None
+    ign: str = Field(..., min_length=1, max_length=50)
+    current_rank_label: str = Field(..., min_length=1, max_length=50)
+    peak_rank_label: Optional[str] = Field(default=None, max_length=50)
+    primary_role: str = Field(..., min_length=1, max_length=50)
+    secondary_role: Optional[str] = Field(default=None, max_length=50)
+    tracker_url: Optional[str] = Field(default=None, max_length=255)
     team_experience: bool
     scrim_experience: bool
-    tournament_experience: str
+    tournament_experience: Literal["none", "local", "regional", "national"]
     fortnite_mode: str | None = None
 
 
 class RecruitApplyInput(BaseModel):
-    first_name: str
-    last_name: str
-    email: str
-    discord: str
-    current_school: Optional[str] = None
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
+    email: EmailStr
+    discord: str = Field(..., min_length=2, max_length=50)
+    current_school: Optional[str] = Field(default=None, max_length=100)
     graduation_year: Optional[int] = None
-    preferred_contact: Optional[str] = None
+    preferred_contact: Optional[Literal["discord", "email"]] = None
 
     availability: AvailabilityInput
-    game_slug: Literal["valorant", "cs2", "fortnite", "r6", "rocket-league", "overwatch"]
+    game_slug: Literal[
+        "valorant",
+        "cs2",
+        "fortnite",
+        "r6",
+        "rocket-league",
+        "overwatch"
+    ]
     profile: RecruitProfileInput
+
+    @field_validator("graduation_year")
+    @classmethod
+    def validate_graduation_year(cls, v):
+        if v is None:
+            return v
+        if v < CURRENT_YEAR or v > CURRENT_YEAR + 6:
+            raise ValueError(f"graduation_year must be between {CURRENT_YEAR} and {CURRENT_YEAR + 6}")
+        return v
