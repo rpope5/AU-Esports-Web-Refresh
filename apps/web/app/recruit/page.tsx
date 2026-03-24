@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch";
 
 type FormState = {
   first_name: string;
@@ -85,6 +85,29 @@ const fortniteRoles = [
   "Flex",
 ];
 
+const r6Roles = [
+  "Entry",
+  "Support",
+  "Flex",
+  "IGL",
+  "Anchor",
+  "Roamer",
+];
+
+const rocketLeagueRoles = [
+  "Striker",
+  "Third Man",
+  "Support",
+  "Flex",
+];
+
+const overwatchRoles = [
+  "Tank",
+  "DPS",
+  "Support",
+  "Flex",
+];
+
 const valorantRanks = [
   "Iron 1",
   "Iron 2",
@@ -131,6 +154,39 @@ const fortniteRanks = [
   "Unreal",
 ];
 
+const r6Ranks = [
+  "Copper",
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Emerald",
+  "Diamond",
+  "Champion",
+];
+
+const rocketLeagueRanks = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Champion",
+  "Grand Champion",
+  "Supersonic Legend",
+];
+
+const overwatchRanks = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Master",
+  "Grandmaster",
+  "Top 500",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -169,7 +225,10 @@ export default function RecruitPage() {
   const roleOptions = useMemo(() => {
   if (form.game_slug === "valorant") return valorantRoles;
   if (form.game_slug === "cs2") return cs2Roles;
-  return fortniteRoles;
+  if (form.game_slug === "fortnite") return fortniteRoles;
+  if (form.game_slug === "r6") return r6Roles;
+  if (form.game_slug === "rocket-league") return rocketLeagueRoles;
+  return overwatchRoles;
 }, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -538,6 +597,9 @@ export default function RecruitPage() {
                 <option value="valorant">Valorant</option>
                 <option value="cs2">Counter-Strike 2</option>
                 <option value="fortnite">Fortnite</option>
+                <option value="r6">Rainbow Six Siege</option>
+                <option value="rocket-league">Rocket League</option>
+                <option value="overwatch">Overwatch</option>
               </select>
             </div>
 
@@ -597,6 +659,50 @@ export default function RecruitPage() {
                       </option>
                     ))}
                   </select>
+                ) : form.game_slug === "r6" ? (
+                  <select
+                   className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                   value={form.current_rank_label}
+                   onChange={(e) => update("current_rank_label", e.target.value)}
+                   required
+                  >
+                    <option value="">Select a rank</option>
+                    {r6Ranks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
+
+                ) : form.game_slug === "rocket-league" ? (
+                  <select
+                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                  value={form.current_rank_label}
+                  onChange={(e) => update("current_rank_label", e.target.value)}
+                  required
+                  >
+                    <option value="">Select a rank</option>
+                    {rocketLeagueRanks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
+
+                ) : form.game_slug === "overwatch" ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.current_rank_label}
+                    onChange={(e) => update("current_rank_label", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a rank</option>
+                      {overwatchRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
                 ) : (
                   <>
                     <input
