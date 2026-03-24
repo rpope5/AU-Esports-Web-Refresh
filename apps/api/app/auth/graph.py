@@ -20,7 +20,8 @@ async def get_graph_token():
         return response.json()
 
 
-async def get_calendar_events(group_id: str):
+async def get_calendar_events():
+    group_id = os.getenv("AZURE_GROUP_ID")  # <-- use .env here
     token = await get_graph_token()
     access_token = token["access_token"]
 
@@ -32,4 +33,9 @@ async def get_calendar_events(group_id: str):
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers)
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Calendar request failed: {response.status_code} {response.text}"
+            )
+
         return response.json()

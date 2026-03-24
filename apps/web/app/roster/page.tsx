@@ -49,7 +49,7 @@ export default function Home() {
 
   // Load roster
 useEffect(() => {
-  fetch("/data/roster.json")
+  fetch("http://localhost:8000/api/v1/roster")
     .then((res) => res.json())
     .then((data) => setPlayers(data))
     .catch(() => console.error("Failed to load roster"));
