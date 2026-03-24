@@ -25,6 +25,11 @@ const gameCards = [
     href: "/admin/recruits/r6",
     description: "View and manage Rainbow Six Siege recruits",
   },
+  {
+    name: "Rocket League",
+    href: "/admin/recruits/rocket-league",
+    description: "View and manage Rocket League recruits",
+  },
 ];
 
 export default function AdminHome() {
