@@ -5,8 +5,8 @@ from app.core.passwords import hash_password
 def seed():
     db = SessionLocal()
 
-    username = "robert"   # change if you want
-    password = "ChangeMe123!"  # change immediately after testing
+    username = ""   # change if you want
+    password = ""  # change immediately after testing
 
     existing = db.query(AdminUser).filter(AdminUser.username == username).first()
     if existing:
