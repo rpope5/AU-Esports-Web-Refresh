@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-COD_ROLE_OPTIONS = {"SMG", "AR", "Flex", "Main AR", "OBJ", "Slayer"}
+COD_ROLE_OPTIONS = {"SMG", "AR", "Flex", "Main AR", "OBJ", "Slayer", "Role Player"}
 
 def cod_rank_to_numeric(rank_label: str) -> float:
     if not rank_label:
