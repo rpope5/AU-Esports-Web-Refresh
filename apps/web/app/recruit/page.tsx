@@ -117,6 +117,7 @@ const codRoles = [
   "Main AR",
   "OBJ",
   "Slayer",
+  "Role Player",
 ];
 
 const valorantRanks = [
