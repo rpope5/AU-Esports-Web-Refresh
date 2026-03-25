@@ -46,6 +46,11 @@ from app.services.scoring.cod import (
     score_cod,
     CODInputs,
 )
+from app.services.scoring.hearthstone import (
+    hearthstone_rank_to_numeric,
+    score_hearthstone,
+    HearthstoneInputs,
+)
 
 router = APIRouter()
 
@@ -257,6 +262,30 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         )
         score, explanation = score_cod(inputs)
         model_version = "v1_cod"
+        
+    elif data.game_slug == "hearthstone":
+        rank_numeric = hearthstone_rank_to_numeric(data.profile.current_rank_label)
+        peak_rank_numeric = (
+            hearthstone_rank_to_numeric(data.profile.peak_rank_label)
+            if data.profile.peak_rank_label
+            else None
+        )
+
+        inputs = HearthstoneInputs(
+            rank_numeric=rank_numeric,
+            ranked_wins=data.profile.ranked_wins or 0,
+            years_played=data.profile.years_played or 0,
+            legend_peak_rank=data.profile.legend_peak_rank,
+            hours_per_week=data.availability.hours_per_week,
+            weeknights_available=data.availability.weeknights_available,
+            weekends_available=data.availability.weekends_available,
+            tournament_experience=data.profile.tournament_experience,
+            tracker_url_present=bool(data.profile.tracker_url),
+            ign_present=bool(data.profile.ign),
+            deck_info_present=bool(data.profile.secondary_role),
+        )
+        score, explanation = score_hearthstone(inputs)
+        model_version = "v1_hearthstone"
 
     else:
         raise HTTPException(status_code=400, detail="Unsupported game")

@@ -5,6 +5,8 @@ from app.services.scoring.r6 import score_r6
 from app.services.scoring.rocket_league import score_rocket_league
 from app.services.scoring.overwatch import score_overwatch
 from app.services.scoring.cod import score_cod
+from app.services.scoring.hearthstone import score_hearthstone
+
 
 SCORERS = {
     "valorant": score_valorant,
@@ -14,4 +16,5 @@ SCORERS = {
     "rocket-league": score_rocket_league,
     "overwatch": score_overwatch,
     "cod": score_cod,
+    "hearthstone": score_hearthstone,
 }
