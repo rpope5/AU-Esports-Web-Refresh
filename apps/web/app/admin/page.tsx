@@ -31,9 +31,14 @@ const gameCards = [
     description: "View and manage Rocket League recruits",
   },
   {
-      name: "Overwatch",
-      href: "/admin/recruits/overwatch",
-      description: "View and manage Overwatch recruits",
+    name: "Overwatch",
+    href: "/admin/recruits/overwatch",
+    description: "View and manage Overwatch recruits",
+  },
+  {
+    name: "Call of Duty",
+    href: "/admin/recruits/cod",
+    description: "View and manage Call of Duty recruits",
   },
 ];
 

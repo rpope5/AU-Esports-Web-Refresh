@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod";
 
 type FormState = {
   first_name: string;
@@ -37,6 +37,8 @@ type Match = {
   game: string;
   time: string;
 };
+
+const graduationYears = Array.from({ length: 7 }, (_, i) => String(new Date().getFullYear() + i));
 
 const pages = [
   "Home",
@@ -106,6 +108,16 @@ const overwatchRoles = [
   "DPS",
   "Support",
   "Flex",
+];
+
+const codRoles = [
+  "SMG",
+  "AR",
+  "Flex",
+  "Main AR",
+  "OBJ",
+  "Slayer",
+  "Role Player",
 ];
 
 const valorantRanks = [
@@ -187,6 +199,17 @@ const overwatchRanks = [
   "Top 500",
 ];
 
+const codRanks = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Crimson",
+  "Iridescent",
+  "Top 250",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -228,7 +251,8 @@ export default function RecruitPage() {
   if (form.game_slug === "fortnite") return fortniteRoles;
   if (form.game_slug === "r6") return r6Roles;
   if (form.game_slug === "rocket-league") return rocketLeagueRoles;
-  return overwatchRoles;
+  if (form.game_slug === "overwatch") return overwatchRoles;
+  return codRoles;
 }, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -526,6 +550,7 @@ const [isLive, setIsLive] = useState(false);
           <h2 className="text-3xl font-semibold">Recruitment</h2>
           <p className="mt-2 text-sm text-neutral-400">
             Submit your information to be considered for the AU Esports program.
+            We have opportunities for scholarships through our athletics department!
           </p>
         </div>
 
@@ -564,12 +589,21 @@ const [isLive, setIsLive] = useState(false);
                 value={form.current_school}
                 onChange={(v) => update("current_school", v)}
               />
-              <Input
-                label="Graduation Year"
-                value={form.graduation_year}
-                onChange={(v) => update("graduation_year", v)}
-              />
-
+              <div>
+                <label className="text-sm text-neutral-300">Graduation Year</label>
+                <select
+                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                  value={form.graduation_year}
+                  onChange={(e) => update("graduation_year", e.target.value)}
+                >
+                  <option value="">Select graduation year</option>
+                  {graduationYears.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="text-sm text-neutral-300">
                   Preferred Contact
@@ -595,6 +629,9 @@ const [isLive, setIsLive] = useState(false);
                 value={form.hours_per_week}
                 onChange={(v) => update("hours_per_week", v)}
                 required
+                type="number"
+                min={1}
+                max={40}
               />
 
               <div className="flex flex-col gap-3 pt-6">
@@ -641,6 +678,7 @@ const [isLive, setIsLive] = useState(false);
                 <option value="r6">Rainbow Six Siege</option>
                 <option value="rocket-league">Rocket League</option>
                 <option value="overwatch">Overwatch</option>
+                <option value="cod">Call of Duty</option>
               </select>
             </div>
 
@@ -744,6 +782,21 @@ const [isLive, setIsLive] = useState(false);
                         </option>
                       ))}
                     </select>
+
+                ) : form.game_slug === "cod" ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.current_rank_label}
+                    onChange={(e) => update("current_rank_label", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a rank</option>
+                    {codRanks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
                 ) : (
                   <>
                     <input
@@ -882,12 +935,16 @@ function Input({
   onChange,
   required = false,
   type = "text",
+  min,
+  max,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
   type?: string;
+  min?: number;
+  max?: number;
 }) {
   return (
     <div>
@@ -898,6 +955,8 @@ function Input({
         onChange={(e) => onChange(e.target.value)}
         required={required}
         type={type}
+        min={min}
+        max={max}
       />
     </div>
   );
