@@ -40,6 +40,11 @@ const gameCards = [
     href: "/admin/recruits/cod",
     description: "View and manage Call of Duty recruits",
   },
+  {
+    name: "Hearthstone",
+    href: "/admin/recruits/hearthstone",
+    description: "View and manage Hearthstone recruits",
+  }
 ];
 
 export default function AdminHome() {

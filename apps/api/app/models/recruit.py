@@ -41,6 +41,11 @@ class RecruitGameProfile(Base):
 
     ign = Column(String)
     fortnite_mode = Column(String, nullable=True)
+    ranked_wins = Column(Integer, nullable=True)
+    years_played = Column(Integer, nullable=True)
+    legend_peak_rank = Column(Integer, nullable=True)
+    preferred_format = Column(String, nullable=True)
+    other_card_games = Column(String, nullable=True)
     current_rank_label = Column(String)
     current_rank_numeric = Column(Float)
     peak_rank_label = Column(String)

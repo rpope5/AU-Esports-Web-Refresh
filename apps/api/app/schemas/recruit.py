@@ -17,12 +17,19 @@ class RecruitProfileInput(BaseModel):
     current_rank_label: str = Field(..., min_length=1, max_length=50)
     peak_rank_label: Optional[str] = Field(default=None, max_length=50)
     primary_role: str = Field(..., min_length=1, max_length=50)
-    secondary_role: Optional[str] = Field(default=None, max_length=50)
+    secondary_role: Optional[str] = Field(default=None, max_length=100)
     tracker_url: Optional[str] = Field(default=None, max_length=255)
     team_experience: bool
     scrim_experience: bool
     tournament_experience: Literal["none", "local", "regional", "national"]
     fortnite_mode: str | None = None
+
+    ranked_wins: Optional[int] = Field(default=None, ge=0, le=50000)
+    years_played: Optional[int] = Field(default=None, ge=0, le=30)
+    legend_peak_rank: Optional[int] = Field(default=None, ge=1, le=50000)
+    preferred_format: Optional[str] = Field(default=None, max_length=50)
+    other_card_games: Optional[str] = Field(default=None, max_length=255)
+    
 
 
 class RecruitApplyInput(BaseModel):
@@ -43,6 +50,7 @@ class RecruitApplyInput(BaseModel):
         "rocket-league",
         "overwatch",
         "cod",
+        "hearthstone",
     ]
     profile: RecruitProfileInput
 

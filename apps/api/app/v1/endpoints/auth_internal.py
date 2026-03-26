@@ -18,7 +18,7 @@ def get_db():
 
 @router.post("/auth/login", response_model=AuthResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    username = data.username.strip().lower()
+    username = data.username.strip()
 
     user = db.query(AdminUser).filter(AdminUser.username == username).first()
     if not user:

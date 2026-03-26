@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone";
 
 type FormState = {
   first_name: string;
@@ -28,6 +28,11 @@ type FormState = {
   team_experience: boolean;
   scrim_experience: boolean;
   tournament_experience: string;
+  ranked_wins: string;
+  years_played: string;
+  legend_peak_rank: string;
+  preferred_format: string;
+  other_card_games: string;
 };
 
 type Match = {
@@ -120,6 +125,20 @@ const codRoles = [
   "Role Player",
 ];
 
+const hearthstoneClasses = [
+  "Death Knight",
+  "Demon Hunter",
+  "Druid",
+  "Hunter",
+  "Mage",
+  "Paladin",
+  "Priest",
+  "Rogue",
+  "Shaman",
+  "Warlock",
+  "Warrior",
+];
+
 const valorantRanks = [
   "Iron 1",
   "Iron 2",
@@ -210,6 +229,15 @@ const codRanks = [
   "Top 250",
 ];
 
+const hearthstoneRanks = [
+  ...Array.from({ length: 5 }, (_, i) => `Bronze ${5 - i}`),
+  ...Array.from({ length: 10 }, (_, i) => `Silver ${10 - i}`),
+  ...Array.from({ length: 10 }, (_, i) => `Gold ${10 - i}`),
+  ...Array.from({ length: 10 }, (_, i) => `Platinum ${10 - i}`),
+  ...Array.from({ length: 10 }, (_, i) => `Diamond ${10 - i}`),
+  "Legend",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -235,6 +263,12 @@ export default function RecruitPage() {
     team_experience: false,
     scrim_experience: false,
     tournament_experience: "none",
+
+    ranked_wins: "",
+    years_played: "",
+    legend_peak_rank: "",
+    preferred_format: "",
+    other_card_games: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -252,7 +286,8 @@ export default function RecruitPage() {
   if (form.game_slug === "r6") return r6Roles;
   if (form.game_slug === "rocket-league") return rocketLeagueRoles;
   if (form.game_slug === "overwatch") return overwatchRoles;
-  return codRoles;
+  if (form.game_slug === "cod") return codRoles;
+  return hearthstoneClasses;
 }, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -273,6 +308,12 @@ export default function RecruitPage() {
       team_experience: false,
       scrim_experience: false,
       tournament_experience: "none",
+
+      ranked_wins: "",
+      years_played: "",
+      legend_peak_rank: "",
+      preferred_format: game === "hearthstone" ? "Standard" : "",
+      other_card_games: "",
     }));
   }
 
@@ -391,6 +432,14 @@ export default function RecruitPage() {
           team_experience: form.team_experience,
           scrim_experience: form.scrim_experience,
           tournament_experience: form.tournament_experience,
+
+          ranked_wins: form.ranked_wins ? Number(form.ranked_wins) : null,
+          years_played: form.years_played ? Number(form.years_played) : null,
+          legend_peak_rank: form.legend_peak_rank
+            ? Number(form.legend_peak_rank)
+            : null,
+          preferred_format: form.game_slug === "hearthstone" ? "Standard" : null,
+          other_card_games: form.other_card_games || null,
         },
       };
 
@@ -436,6 +485,12 @@ export default function RecruitPage() {
         team_experience: false,
         scrim_experience: false,
         tournament_experience: "none",
+
+        ranked_wins: "",
+        years_played: "",
+        legend_peak_rank: "",
+        preferred_format: "",
+        other_card_games: "",
       }));
     } catch (e: any) {
       setErr(e?.message || "Submission failed");
@@ -679,8 +734,60 @@ const [isLive, setIsLive] = useState(false);
                 <option value="rocket-league">Rocket League</option>
                 <option value="overwatch">Overwatch</option>
                 <option value="cod">Call of Duty</option>
+                <option value="hearthstone">Hearthstone</option>
               </select>
             </div>
+            {form.game_slug === "hearthstone" && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Ranked Wins"
+                  value={form.ranked_wins}
+                  onChange={(v) => update("ranked_wins", v)}
+                  type="number"
+                  min={0}
+                  max={50000}
+                />
+
+                <Input
+                  label="Years Played"
+                  value={form.years_played}
+                  onChange={(v) => update("years_played", v)}
+                  type="number"
+                  min={0}
+                  max={30}
+                />
+
+                <Input
+                  label="Legend Peak Rank (if applicable)"
+                  value={form.legend_peak_rank}
+                  onChange={(v) => update("legend_peak_rank", v)}
+                  type="number"
+                  min={1}
+                  max={50000}
+                />
+
+                <div>
+                  <label className="text-sm text-neutral-300">Preferred Format</label>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value="Standard"
+                    disabled
+                  />
+                </div>
+
+                <Input
+                  label="Favorite Meta Deck"
+                  value={form.secondary_role}
+                  onChange={(v) => update("secondary_role", v)}
+                />
+
+                <Input
+                  label="Other Card Games Played"
+                  value={form.other_card_games}
+                  onChange={(v) => update("other_card_games", v)}
+                />
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               {form.game_slug === "fortnite" && (
@@ -797,6 +904,22 @@ const [isLive, setIsLive] = useState(false);
                       </option>
                     ))}
                   </select>
+
+                ) : form.game_slug === "hearthstone" ? (
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.current_rank_label}
+                    onChange={(e) => update("current_rank_label", e.target.value)}
+                    required
+                  >
+                    <option value="">Select a rank</option>
+                    {hearthstoneRanks.map((rank) => (
+                      <option key={rank} value={rank}>
+                        {rank}
+                      </option>
+                    ))}
+                  </select>
+                  
                 ) : (
                   <>
                     <input
