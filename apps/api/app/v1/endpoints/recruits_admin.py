@@ -123,7 +123,8 @@ def get_recruit_detail(
     )
 
     profiles = (
-        db.query(RecruitGameProfile)
+        db.query(RecruitGameProfile, Game)
+        .outerjoin(Game, RecruitGameProfile.game_id == Game.id)
         .filter(RecruitGameProfile.application_id == application_id)
         .all()
     )
@@ -161,6 +162,8 @@ def get_recruit_detail(
         "profiles": [
             {
                 "game_id": p.game_id,
+                "game_name": game.name if game else None,
+                "game_slug": game.slug if game else None,
                 "ign": p.ign,
                 "current_rank_label": p.current_rank_label,
                 "current_rank_numeric": p.current_rank_numeric,
@@ -172,8 +175,13 @@ def get_recruit_detail(
                 "team_experience": p.team_experience,
                 "scrim_experience": p.scrim_experience,
                 "tournament_experience": p.tournament_experience,
+                "ranked_wins": p.ranked_wins,
+                "years_played": p.years_played,
+                "legend_peak_rank": p.legend_peak_rank,
+                "preferred_format": p.preferred_format,
+                "other_card_games": p.other_card_games,
             }
-            for p in profiles
+            for p, game in profiles
         ],
         "rankings": [
             {

@@ -306,6 +306,11 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         scrim_experience=data.profile.scrim_experience,
         tournament_experience=data.profile.tournament_experience,
         fortnite_mode=data.profile.fortnite_mode,
+        ranked_wins=data.profile.ranked_wins,
+        years_played=data.profile.years_played,
+        legend_peak_rank=data.profile.legend_peak_rank,
+        preferred_format=data.profile.preferred_format,
+        other_card_games=data.profile.other_card_games,
     )
 
     db.add(profile)
