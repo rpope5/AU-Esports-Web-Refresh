@@ -89,6 +89,28 @@ async function saveNotes() {
   const ranking = data.rankings?.[0];
   const review = data.review;
 
+  const extraFields = [
+    profile?.ranked_wins != null
+      ? { label: "Ranked Wins", value: profile.ranked_wins }
+      : null,
+    profile?.years_played != null
+      ? { label: "Years Played", value: profile.years_played }
+      : null,
+    profile?.legend_peak_rank != null
+      ? { label: "Legend Peak Rank", value: profile.legend_peak_rank }
+      : null,
+    profile?.preferred_format
+      ? { label: "Preferred Format", value: profile.preferred_format }
+      : null,
+    profile?.other_card_games
+      ? { label: "Other Card Games", value: profile.other_card_games }
+      : null,
+  ].filter(
+    (field): field is { label: string; value: string | number } => field !== null
+  );
+
+  
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -102,6 +124,7 @@ async function saveNotes() {
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
         <h2 className="text-lg font-medium">Profile</h2>
         <div className="mt-3 space-y-2 text-sm">
+          {profile?.game_name && <p>Game: {profile.game_name}</p>}
           <p>IGN: {profile?.ign}</p>
           <p>Current Rank: {profile?.current_rank_label}</p>
           <p>Peak Rank: {profile?.peak_rank_label || "N/A"}</p>
@@ -109,8 +132,21 @@ async function saveNotes() {
           <p>Secondary Role: {profile?.secondary_role || "N/A"}</p>
           <p>Tournament Experience: {profile?.tournament_experience}</p>
           <p>Tracker: {profile?.tracker_url || "N/A"}</p>
+
+          {extraFields.length > 0 && (
+            <div className="mt-4 space-y-2 text-sm">
+              <h3 className="text-sm font-medium text-neutral-300">Additional Info</h3>
+              {extraFields.map((field, idx) => (
+                <p key={idx}>
+                  {field.label}: {field.value}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
         <h2 className="text-lg font-medium">Availability</h2>
@@ -179,3 +215,4 @@ async function saveNotes() {
     </div>
   );
 }
+
