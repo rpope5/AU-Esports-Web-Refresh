@@ -45,13 +45,16 @@ export default function Home() {
   const [matches, setMatches] = useState<any[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
 
-  useEffect(() => {
-    fetch("/data/roster.json")
-      .then((res) => res.json())
-      .then((data) => setPlayers(data))
-      .catch(() => console.error("Failed to load roster"));
-  }, []);
+<<<<<<< HEAD
+  // Load roster
+useEffect(() => {
+  fetch("http://localhost:8000/api/v1/roster")
+    .then((res) => res.json())
+    .then((data) => setPlayers(data))
+    .catch(() => console.error("Failed to load roster"));
+}, []);
 
+// Load matches
   useEffect(() => {
     const tryLoad = async () => {
       try {
