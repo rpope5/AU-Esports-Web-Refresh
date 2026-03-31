@@ -7,6 +7,8 @@ from app.services.scoring.overwatch import score_overwatch
 from app.services.scoring.cod import score_cod
 from app.services.scoring.hearthstone import score_hearthstone
 from app.services.scoring.smash import score_smash
+from app.services.scoring.mario_kart import score_mario_kart
+
 
 
 SCORERS = {
@@ -19,4 +21,5 @@ SCORERS = {
     "cod": score_cod,
     "hearthstone": score_hearthstone,
     "smash":score_smash,
+    "mario-kart":score_mario_kart
 }

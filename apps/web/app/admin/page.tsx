@@ -51,6 +51,12 @@ const gameCards = [
     href: "/admin/recruits/smash",
     description: "View and manage Smash recruits",
   },
+
+  {
+    name: "Mario Kart",
+    href: "/admin/recruits/mario-kart",
+    description: "View and manage Mario Kart recruits",
+  }
 ];
 
 export default function AdminHome() {
