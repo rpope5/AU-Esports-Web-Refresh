@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone" | "smash";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone" | "smash" | "mario-kart";
 
 type FormState = {
   first_name: string;
@@ -37,6 +37,11 @@ type FormState = {
   regional_rank: string;
   best_wins: string;
   characters: string;
+  lounge_rating: string;
+  preferred_title: string;
+  controller_type: string;
+  playstyle: string;
+  preferred_tracks: string;
 };
 
 type Match = {
@@ -335,6 +340,26 @@ const smashCharacters = [
   "Sora"
 ];
 
+const marioKartTitles = [
+  "Mario Kart 8 Deluxe",
+  "Mario Kart World",
+  "Both",
+];
+
+const marioKartPlaystyles = [
+  "Front-runner",
+  "Bagging",
+  "Support",
+  "Flex",
+];
+
+const marioKartControllers = [
+  "Joy-Con",
+  "Pro Controller",
+  "GameCube Controller",
+  "Other",
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -371,6 +396,12 @@ export default function RecruitPage() {
     regional_rank: "",
     best_wins: "",
     characters: "",
+
+    lounge_rating: "",
+    preferred_title: "",
+    controller_type: "",
+    playstyle: "",
+    preferred_tracks: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -390,6 +421,7 @@ export default function RecruitPage() {
   if (form.game_slug === "overwatch") return overwatchRoles;
   if (form.game_slug === "cod") return codRoles;
   if (form.game_slug === "hearthstone") return hearthstoneClasses;
+  if (form.game_slug === "mario-kart") return marioKartPlaystyles;
   return [];
 }, [form.game_slug]);
 
@@ -422,6 +454,12 @@ export default function RecruitPage() {
       regional_rank: "",
       best_wins: "",
       characters: "",
+
+      lounge_rating: "",
+      preferred_title: "",
+      controller_type: "",
+      playstyle: "",
+      preferred_tracks: "",
     }));
   }
 
@@ -557,6 +595,12 @@ export default function RecruitPage() {
           regional_rank: form.regional_rank || null,
           best_wins: form.best_wins || null,
           characters: form.characters || null,
+
+          lounge_rating: form.lounge_rating ? Number(form.lounge_rating) : null,
+          preferred_title: form.preferred_title || null,
+          controller_type: form.controller_type || null,
+          playstyle: form.playstyle || null,
+          preferred_tracks: form.preferred_tracks || null,
         },
       };
 
@@ -858,6 +902,7 @@ const [isLive, setIsLive] = useState(false);
                 <option value="cod">Call of Duty</option>
                 <option value="hearthstone">Hearthstone</option>
                 <option value="smash">Super Smash Bros. Ultimate</option>
+                <option value="mario-kart">Mario Kart</option>
               </select>
             </div>
             {form.game_slug === "hearthstone" && (
@@ -908,6 +953,75 @@ const [isLive, setIsLive] = useState(false);
                   label="Other Card Games Played"
                   value={form.other_card_games}
                   onChange={(v) => update("other_card_games", v)}
+                />
+              </div>
+            )}
+            {form.game_slug === "mario-kart" && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Lounge Rating"
+                  value={form.lounge_rating}
+                  onChange={(v) => update("lounge_rating", v)}
+                  type="number"
+                  min={0}
+                  max={10000}
+                />
+
+                <div>
+                  <label className="text-sm text-neutral-300">Preferred Title</label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.preferred_title}
+                    onChange={(e) => update("preferred_title", e.target.value)}
+                  >
+                    <option value="">Select a title</option>
+                    {marioKartTitles.map((title) => (
+                      <option key={title} value={title}>
+                        {title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm text-neutral-300">Controller Type</label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.controller_type}
+                    onChange={(e) => update("controller_type", e.target.value)}
+                  >
+                    <option value="">Select a controller</option>
+                    {marioKartControllers.map((controller) => (
+                      <option key={controller} value={controller}>
+                        {controller}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm text-neutral-300">Playstyle</label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.playstyle}
+                    onChange={(e) => {
+                      update("playstyle", e.target.value);
+                      update("primary_role", e.target.value);
+                    }}
+                  >
+                    <option value="">Select a playstyle</option>
+                    {marioKartPlaystyles.map((style) => (
+                      <option key={style} value={style}>
+                        {style}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <Input
+                  label="Preferred Tracks / Notes"
+                  value={form.preferred_tracks}
+                  onChange={(v) => update("preferred_tracks", v)}
                 />
               </div>
             )}
@@ -967,7 +1081,7 @@ const [isLive, setIsLive] = useState(false);
               </div>
             )}
 
-            {form.game_slug === "smash" && (
+            {(form.game_slug === "mario-kart" || form.game_slug === "smash") && (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-sm text-neutral-300">
@@ -1011,7 +1125,7 @@ const [isLive, setIsLive] = useState(false);
               </div>
             )}
 
-            {form.game_slug !== "smash" && (
+            {form.game_slug !== "mario-kart" && form.game_slug !== "smash" && (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {form.game_slug === "fortnite" && (
                   <div>

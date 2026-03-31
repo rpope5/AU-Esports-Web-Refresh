@@ -55,6 +55,11 @@ from app.services.scoring.smash import (
     score_smash,
     SmashInputs,
 )
+from app.services.scoring.mario_kart import (
+    mario_kart_rank_to_numeric,
+    score_mario_kart,
+    MarioKartInputs,
+)
 
 
 router = APIRouter()
@@ -308,6 +313,27 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         )
         score, explanation = score_smash(inputs)
         model_version = "v1_smash"
+        
+    elif data.game_slug == "mario-kart":
+        rank_numeric = float(data.profile.lounge_rating or 0)
+        peak_rank_numeric = None
+
+        inputs = MarioKartInputs(
+            lounge_rating=data.profile.lounge_rating,
+            hours_per_week=data.availability.hours_per_week,
+            weeknights_available=data.availability.weeknights_available,
+            weekends_available=data.availability.weekends_available,
+            team_experience=data.profile.team_experience,
+            scrim_experience=data.profile.scrim_experience,
+            tournament_experience=data.profile.tournament_experience,
+            tracker_url_present=bool(data.profile.tracker_url),
+            ign_present=bool(data.profile.ign),
+            preferred_title_present=bool(data.profile.preferred_title),
+            controller_present=bool(data.profile.controller_type),
+            playstyle_present=bool(data.profile.playstyle),
+        )
+        score, explanation = score_mario_kart(inputs)
+        model_version = "v1_mario_kart"
 
     else:
         raise HTTPException(status_code=400, detail="Unsupported game")
@@ -337,6 +363,11 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         regional_rank=data.profile.regional_rank,
         best_wins=data.profile.best_wins,
         characters=data.profile.characters,
+        lounge_rating=data.profile.lounge_rating,
+        preferred_title=data.profile.preferred_title,
+        controller_type=data.profile.controller_type,
+        playstyle=data.profile.playstyle,
+        preferred_tracks=data.profile.preferred_tracks,
     )
 
     db.add(profile)

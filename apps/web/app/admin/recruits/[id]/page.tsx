@@ -184,6 +184,11 @@ async function saveNotes() {
               <p>Other Card Games: {profile.other_card_games}</p>
             )}
           </div>
+          {profile?.lounge_rating != null && <p>Lounge Rating: {profile.lounge_rating}</p>}
+          {profile?.preferred_title && <p>Preferred Title: {profile.preferred_title}</p>}
+          {profile?.controller_type && <p>Controller Type: {profile.controller_type}</p>}
+          {profile?.playstyle && <p>Playstyle: {profile.playstyle}</p>}
+          {profile?.preferred_tracks && <p>Preferred Tracks / Notes: {profile.preferred_tracks}</p>}
         </div>
 
         {characterList.length > 0 && (

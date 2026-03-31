@@ -184,6 +184,11 @@ def get_recruit_detail(
                 "regional_rank": p.regional_rank,
                 "best_wins": p.best_wins,
                 "characters": p.characters,
+                "lounge_rating": p.lounge_rating,
+                "preferred_title": p.preferred_title,
+                "controller_type": p.controller_type,
+                "playstyle": p.playstyle,
+                "preferred_tracks": p.preferred_tracks,
             }
             for p, game in profiles
         ],

@@ -35,6 +35,12 @@ class RecruitProfileInput(BaseModel):
     best_wins: Optional[str] = Field(default=None, max_length=500)
     characters: Optional[str] = Field(default=None, max_length=500)
     
+    lounge_rating: Optional[int] = Field(default=None, ge=0, le=10000)
+    preferred_title: Optional[str] = Field(default=None, max_length=50)
+    controller_type: Optional[str] = Field(default=None, max_length=50)
+    playstyle: Optional[str] = Field(default=None, max_length=50)
+    preferred_tracks: Optional[str] = Field(default=None, max_length=255)
+    
 
 
 class RecruitApplyInput(BaseModel):
@@ -57,6 +63,7 @@ class RecruitApplyInput(BaseModel):
         "cod",
         "hearthstone",
         "smash",
+        "mario-kart"
     ]
     profile: RecruitProfileInput
 
