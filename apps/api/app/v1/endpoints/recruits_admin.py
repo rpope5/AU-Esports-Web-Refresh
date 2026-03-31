@@ -180,6 +180,10 @@ def get_recruit_detail(
                 "legend_peak_rank": p.legend_peak_rank,
                 "preferred_format": p.preferred_format,
                 "other_card_games": p.other_card_games,
+                "gsp": p.gsp,
+                "regional_rank": p.regional_rank,
+                "best_wins": p.best_wins,
+                "characters": p.characters,
             }
             for p, game in profiles
         ],

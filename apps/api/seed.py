@@ -10,7 +10,7 @@ GAMES_TO_SEED = [
     {"name": "Tom Clancy's Rainbow Six Siege", "slug": "r6"},
     {"name": "Rocket League", "slug": "rocket-league"},
     {"name": "Overwatch", "slug": "overwatch"},
-    {"name": "Super Smash Bros. Ultimate", "slug": "smash-ultimate"},
+    {"name": "Super Smash Bros. Ultimate", "slug": "smash"},
     {"name": "Mario Kart", "slug": "mario-kart"},
 ]
 

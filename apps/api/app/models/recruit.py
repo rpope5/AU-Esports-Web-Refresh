@@ -32,7 +32,6 @@ class RecruitAvailability(Base):
     application = relationship("RecruitApplication", back_populates="availability")
 
 class RecruitGameProfile(Base):
-    #Valorant-specific for now, but could be extended to other games in the future
     __tablename__ = "recruit_game_profiles"
 
     id = Column(Integer, primary_key=True)
@@ -46,6 +45,10 @@ class RecruitGameProfile(Base):
     legend_peak_rank = Column(Integer, nullable=True)
     preferred_format = Column(String, nullable=True)
     other_card_games = Column(String, nullable=True)
+    gsp = Column(Integer, nullable=True)
+    regional_rank = Column(String, nullable=True)
+    best_wins = Column(String, nullable=True)
+    characters = Column(String, nullable=True)
     current_rank_label = Column(String)
     current_rank_numeric = Column(Float)
     peak_rank_label = Column(String)

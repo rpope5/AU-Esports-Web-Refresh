@@ -51,6 +51,11 @@ from app.services.scoring.hearthstone import (
     score_hearthstone,
     HearthstoneInputs,
 )
+from app.services.scoring.smash import (
+    score_smash,
+    SmashInputs,
+)
+
 
 router = APIRouter()
 
@@ -95,6 +100,8 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Game not found")
 
     # Game-specific rank parsing + scoring
+    rank_numeric = None
+    peak_rank_numeric = None
     if data.game_slug == "valorant":
         rank_numeric = valorant_rank_to_numeric(data.profile.current_rank_label)
         peak_rank_numeric = (
@@ -286,6 +293,21 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         )
         score, explanation = score_hearthstone(inputs)
         model_version = "v1_hearthstone"
+        
+    elif data.game_slug == "smash":
+        inputs = SmashInputs(
+            gsp=data.profile.gsp or 0,
+            regional_rank=data.profile.regional_rank,
+            best_wins=data.profile.best_wins,
+            hours_per_week=data.availability.hours_per_week,
+            weeknights_available=data.availability.weeknights_available,
+            weekends_available=data.availability.weekends_available,
+            tournament_experience=data.profile.tournament_experience,
+            tracker_url_present=bool(data.profile.tracker_url),
+            characters_present=bool(data.profile.characters),
+        )
+        score, explanation = score_smash(inputs)
+        model_version = "v1_smash"
 
     else:
         raise HTTPException(status_code=400, detail="Unsupported game")
@@ -311,6 +333,10 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         legend_peak_rank=data.profile.legend_peak_rank,
         preferred_format=data.profile.preferred_format,
         other_card_games=data.profile.other_card_games,
+        gsp=data.profile.gsp,
+        regional_rank=data.profile.regional_rank,
+        best_wins=data.profile.best_wins,
+        characters=data.profile.characters,
     )
 
     db.add(profile)

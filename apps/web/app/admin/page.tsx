@@ -44,7 +44,13 @@ const gameCards = [
     name: "Hearthstone",
     href: "/admin/recruits/hearthstone",
     description: "View and manage Hearthstone recruits",
-  }
+  },
+
+  {
+    name: "Smash",
+    href: "/admin/recruits/smash",
+    description: "View and manage Smash recruits",
+  },
 ];
 
 export default function AdminHome() {
