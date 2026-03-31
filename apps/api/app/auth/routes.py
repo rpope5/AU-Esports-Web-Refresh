@@ -10,8 +10,8 @@ router = APIRouter()
 
 @router.get("/auth/request-consent")
 def request_consent():
-    tenant_id = os.getenv("c8590879-16e2-4eef-803b-2c1745e7cf9e")
-    client_id = os.getenv("d7cf09b9-36a3-4b8a-bfe9-91c306773374")
+    tenant_id = os.getenv("AZURE_TENANT_ID")
+    client_id = os.getenv("AZURE_CLIENT_ID")
     redirect_uri = urllib.parse.quote(os.getenv("REDIRECT_URI"), safe="")
 
     url = (
@@ -40,7 +40,7 @@ async def debug_group():
 
 
 
-router = APIRouter()
+
 
 @router.get("/calendar/{group_id}")
 async def calendar(group_id: str):

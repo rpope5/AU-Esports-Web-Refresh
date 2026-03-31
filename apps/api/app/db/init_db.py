@@ -8,6 +8,7 @@ from app.models.recruit import (  # noqa: F401
     RecruitGameProfile,
     RecruitRanking,
 )
+from app.models import roster
 
 # If you add AdminUser later, import it here too.
 # from app.models.user import AdminUser  # noqa: F401
