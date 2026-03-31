@@ -89,6 +89,22 @@ async function saveNotes() {
   const ranking = data.rankings?.[0];
   const review = data.review;
 
+  const characterList =
+    profile?.characters
+      ? profile.characters.split(",").map((c: string) => c.trim()).filter(Boolean)
+      : [];
+
+  const bestWinsList =
+    profile?.best_wins
+      ? profile.best_wins.split(",").map((w: string) => w.trim()).filter(Boolean)
+      : [];
+
+  const isSmashProfile =
+    profile?.gsp != null ||
+    !!profile?.regional_rank ||
+    !!profile?.best_wins ||
+    !!profile?.characters;
+
   const extraFields = [
     profile?.ranked_wins != null
       ? { label: "Ranked Wins", value: profile.ranked_wins }
@@ -105,6 +121,7 @@ async function saveNotes() {
     profile?.other_card_games
       ? { label: "Other Card Games", value: profile.other_card_games }
       : null,
+
   ].filter(
     (field): field is { label: string; value: string | number } => field !== null
   );
@@ -122,28 +139,84 @@ async function saveNotes() {
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <h2 className="text-lg font-medium">Profile</h2>
-        <div className="mt-3 space-y-2 text-sm">
-          {profile?.game_name && <p>Game: {profile.game_name}</p>}
-          <p>IGN: {profile?.ign}</p>
-          <p>Current Rank: {profile?.current_rank_label}</p>
-          <p>Peak Rank: {profile?.peak_rank_label || "N/A"}</p>
-          <p>Primary Role: {profile?.primary_role}</p>
-          <p>Secondary Role: {profile?.secondary_role || "N/A"}</p>
-          <p>Tournament Experience: {profile?.tournament_experience}</p>
-          <p>Tracker: {profile?.tracker_url || "N/A"}</p>
+        <h2 className="text-lg font-medium">
+          {isSmashProfile ? "Smash Scouting Profile" : "Game Profile"}
+        </h2>
 
-          {extraFields.length > 0 && (
-            <div className="mt-4 space-y-2 text-sm">
-              <h3 className="text-sm font-medium text-neutral-300">Additional Info</h3>
-              {extraFields.map((field, idx) => (
-                <p key={idx}>
-                  {field.label}: {field.value}
-                </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 text-sm">
+            <p>IGN / BattleTag: {profile?.ign || "N/A"}</p>
+            <p>Current Rank: {profile?.current_rank_label || "N/A"}</p>
+            <p>Peak Rank: {profile?.peak_rank_label || "N/A"}</p>
+            <p>Primary Role / Main Focus: {profile?.primary_role || "N/A"}</p>
+            <p>Secondary Role / Extra Info: {profile?.secondary_role || "N/A"}</p>
+            <p>Tournament Experience: {profile?.tournament_experience || "N/A"}</p>
+
+            {profile?.tracker_url ? (
+              <p>
+                Tracker:{" "}
+                <a
+                  href={profile.tracker_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-400 underline"
+                >
+                  Open Link
+                </a>
+              </p>
+            ) : (
+              <p>Tracker: N/A</p>
+            )}
+          </div>
+
+          <div className="space-y-2 text-sm">
+            {profile?.gsp != null && <p>GSP: {profile.gsp}</p>}
+            {profile?.regional_rank && <p>Regional Rank: {profile.regional_rank}</p>}
+            {profile?.ranked_wins != null && <p>Ranked Wins: {profile.ranked_wins}</p>}
+            {profile?.years_played != null && <p>Years Played: {profile.years_played}</p>}
+            {profile?.legend_peak_rank != null && (
+              <p>Legend Peak Rank: {profile.legend_peak_rank}</p>
+            )}
+            {profile?.preferred_format && (
+              <p>Preferred Format: {profile.preferred_format}</p>
+            )}
+            {profile?.other_card_games && (
+              <p>Other Card Games: {profile.other_card_games}</p>
+            )}
+          </div>
+        </div>
+
+        {characterList.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-neutral-300">Characters Played</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {characterList.map((char: string) => (
+                <span
+                  key={char}
+                  className="rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs"
+                >
+                  {char}
+                </span>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {bestWinsList.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-neutral-300">Best Wins</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {bestWinsList.map((win: string) => (
+                <span
+                  key={win}
+                  className="rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs"
+                >
+                  {win}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       
@@ -158,13 +231,23 @@ async function saveNotes() {
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <h2 className="text-lg font-medium">Ranking</h2>
-        <div className="mt-3 space-y-2 text-sm">
-          <p>Score: {ranking?.score ?? "N/A"}</p>
-          <pre className="mt-3 overflow-x-auto rounded-lg bg-black/30 p-3 text-xs">
-            {JSON.stringify(ranking?.explanation_json, null, 2)}
-          </pre>
-          <p>Status: {review?.status}</p>
+        <h2 className="text-lg font-medium">Recruit Ranking</h2>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-sm text-neutral-400">Overall Score</p>
+            <p className="mt-1 text-3xl font-semibold">{ranking?.score ?? "N/A"}</p>
+            <p className="mt-3 text-sm text-neutral-400">
+              Status: <span className="text-white">{review?.status || "NEW"}</span>
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-neutral-400">Scoring Breakdown</p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-black/30 p-3 text-xs">
+              {JSON.stringify(ranking?.explanation_json, null, 2)}
+            </pre>
+          </div>
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone";
+type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone" | "smash";
 
 type FormState = {
   first_name: string;
@@ -33,6 +33,10 @@ type FormState = {
   legend_peak_rank: string;
   preferred_format: string;
   other_card_games: string;
+  gsp: string;
+  regional_rank: string;
+  best_wins: string;
+  characters: string;
 };
 
 type Match = {
@@ -238,6 +242,99 @@ const hearthstoneRanks = [
   "Legend",
 ];
 
+const smashCharacters = [
+  "Mario",
+  "Donkey Kong",
+  "Link",
+  "Samus",
+  "Dark Samus",
+  "Yoshi",
+  "Kirby",
+  "Fox",
+  "Pikachu",
+  "Luigi",
+  "Ness",
+  "Captain Falcon",
+  "Jigglypuff",
+  "Peach",
+  "Daisy",
+  "Bowser",
+  "Ice Climbers",
+  "Sheik",
+  "Zelda",
+  "Dr. Mario",
+  "Pichu",
+  "Falco",
+  "Marth",
+  "Lucina",
+  "Young Link",
+  "Ganondorf",
+  "Mewtwo",
+  "Roy",
+  "Chrom",
+  "Mr. Game & Watch",
+  "Meta Knight",
+  "Pit",
+  "Dark Pit",
+  "Zero Suit Samus",
+  "Wario",
+  "Snake",
+  "Ike",
+  "Pokémon Trainer",
+  "Diddy Kong",
+  "Lucas",
+  "Sonic",
+  "King Dedede",
+  "Olimar",
+  "Lucario",
+  "R.O.B.",
+  "Toon Link",
+  "Wolf",
+  "Villager",
+  "Mega Man",
+  "Wii Fit Trainer",
+  "Rosalina & Luma",
+  "Little Mac",
+  "Greninja",
+  "Mii Brawler",
+  "Mii Swordfighter",
+  "Mii Gunner",
+  "Palutena",
+  "Pac-Man",
+  "Robin",
+  "Shulk",
+  "Bowser Jr.",
+  "Duck Hunt",
+  "Ryu",
+  "Ken",
+  "Cloud",
+  "Corrin",
+  "Bayonetta",
+  "Inkling",
+  "Ridley",
+  "Simon",
+  "Richter",
+  "King K. Rool",
+  "Isabelle",
+  "Incineroar",
+  "Piranha Plant",
+
+  // DLC Fighters Pass 1
+  "Joker",
+  "Hero",
+  "Banjo & Kazooie",
+  "Terry",
+  "Byleth",
+
+  // DLC Fighters Pass 2
+  "Min Min",
+  "Steve",
+  "Sephiroth",
+  "Pyra/Mythra",
+  "Kazuya",
+  "Sora"
+];
+
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -269,6 +366,11 @@ export default function RecruitPage() {
     legend_peak_rank: "",
     preferred_format: "",
     other_card_games: "",
+
+    gsp: "",
+    regional_rank: "",
+    best_wins: "",
+    characters: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -287,7 +389,8 @@ export default function RecruitPage() {
   if (form.game_slug === "rocket-league") return rocketLeagueRoles;
   if (form.game_slug === "overwatch") return overwatchRoles;
   if (form.game_slug === "cod") return codRoles;
-  return hearthstoneClasses;
+  if (form.game_slug === "hearthstone") return hearthstoneClasses;
+  return [];
 }, [form.game_slug]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -314,6 +417,11 @@ export default function RecruitPage() {
       legend_peak_rank: "",
       preferred_format: game === "hearthstone" ? "Standard" : "",
       other_card_games: "",
+
+      gsp: "",
+      regional_rank: "",
+      best_wins: "",
+      characters: "",
     }));
   }
 
@@ -421,13 +529,17 @@ export default function RecruitPage() {
         },
         game_slug: form.game_slug,
         profile: {
-          ign: form.ign,
+          ign: form.game_slug === "smash" ? null : form.ign || null,
           fortnite_mode:
             form.game_slug === "fortnite" ? form.fortnite_mode : null,
-          current_rank_label: form.current_rank_label,
-          peak_rank_label: form.peak_rank_label || null,
-          primary_role: form.primary_role,
-          secondary_role: form.secondary_role || null,
+          current_rank_label:
+            form.game_slug === "smash" ? null : form.current_rank_label || null,
+          peak_rank_label:
+            form.game_slug === "smash" ? null : form.peak_rank_label || null,
+          primary_role:
+            form.game_slug === "smash" ? null : form.primary_role || null,
+          secondary_role:
+            form.game_slug === "smash" ? null : form.secondary_role || null,
           tracker_url: form.tracker_url || null,
           team_experience: form.team_experience,
           scrim_experience: form.scrim_experience,
@@ -440,6 +552,11 @@ export default function RecruitPage() {
             : null,
           preferred_format: form.game_slug === "hearthstone" ? "Standard" : null,
           other_card_games: form.other_card_games || null,
+
+          gsp: form.gsp ? Number(form.gsp) : null,
+          regional_rank: form.regional_rank || null,
+          best_wins: form.best_wins || null,
+          characters: form.characters || null,
         },
       };
 
@@ -491,6 +608,11 @@ export default function RecruitPage() {
         legend_peak_rank: "",
         preferred_format: "",
         other_card_games: "",
+
+        gsp: "",
+        regional_rank: "",
+        best_wins: "",
+        characters: "",
       }));
     } catch (e: any) {
       setErr(e?.message || "Submission failed");
@@ -735,6 +857,7 @@ const [isLive, setIsLive] = useState(false);
                 <option value="overwatch">Overwatch</option>
                 <option value="cod">Call of Duty</option>
                 <option value="hearthstone">Hearthstone</option>
+                <option value="smash">Super Smash Bros. Ultimate</option>
               </select>
             </div>
             {form.game_slug === "hearthstone" && (
@@ -788,245 +911,349 @@ const [isLive, setIsLive] = useState(false);
                 />
               </div>
             )}
+            {form.game_slug === "smash" && (
+              <div className="mt-6">
+                <label className="text-sm text-neutral-300">Characters Played</label>
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                  {smashCharacters.map((char) => (
+                    <label key={char} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={form.characters?.includes(char)}
+                        onChange={(e) => {
+                          const current = form.characters ? form.characters.split(",") : [];
+                          if (e.target.checked) {
+                            update("characters", [...current, char].join(","));
+                          } else {
+                            update(
+                              "characters",
+                              current.filter((c) => c !== char).join(",")
+                            );
+                          }
+                        }}
+                      />
+                      {char}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {form.game_slug === "smash" && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="GSP"
+                  value={form.gsp}
+                  onChange={(v) => update("gsp", v)}
+                  type="number"
+                />
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {form.game_slug === "fortnite" && (
+                <Input
+                  label="Regional Ranking"
+                  value={form.regional_rank}
+                  onChange={(v) => update("regional_rank", v)}
+                />
+
+                <Input
+                  label="Best Wins (comma separated)"
+                  value={form.best_wins}
+                  onChange={(v) => update("best_wins", v)}
+                />
+
+                <Input
+                  label="SmashersApp / Tracker Link"
+                  value={form.tracker_url}
+                  onChange={(v) => update("tracker_url", v)}
+                />
+              </div>
+            )}
+
+            {form.game_slug === "smash" && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm text-neutral-300">Fortnite Mode</label>
+                  <label className="text-sm text-neutral-300">
+                    Tournament Experience
+                  </label>
                   <select
                     className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                    value={form.fortnite_mode}
-                    onChange={(e) => update("fortnite_mode", e.target.value)}
-                    required
+                    value={form.tournament_experience}
+                    onChange={(e) => update("tournament_experience", e.target.value)}
                   >
-                    <option value="">Select a mode</option>
-                    <option value="builds">Builds</option>
-                    <option value="zero_builds">Zero Builds</option>
+                    <option value="none">None</option>
+                    <option value="local">Local</option>
+                    <option value="regional">Regional</option>
+                    <option value="national">National</option>
                   </select>
                 </div>
-              )}
-              <Input
-                label="In-Game Name"
-                value={form.ign}
-                onChange={(v) => update("ign", v)}
-                required
-              />
 
-              <div>
-                <label className="text-sm text-neutral-300">Current Rank</label>
+                <div className="flex flex-col gap-3 pt-6">
+                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={form.team_experience}
+                      onChange={(e) =>
+                        update("team_experience", e.target.checked)
+                      }
+                    />
+                    Team experience
+                  </label>
 
-                {form.game_slug === "valorant" ? (
-                  <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                    value={form.current_rank_label}
-                    onChange={(e) =>
-                      update("current_rank_label", e.target.value)
-                    }
-                    required
-                  >
-                    <option value="">Select a rank</option>
-                    {valorantRanks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
-                ) : form.game_slug === "fortnite" ? (
-                  <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                    value={form.current_rank_label}
-                    onChange={(e) => update("current_rank_label", e.target.value)}
-                    required
-                  >
-                    <option value="">Select a rank</option>
-                    {fortniteRanks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
-                ) : form.game_slug === "r6" ? (
-                  <select
-                   className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                   value={form.current_rank_label}
-                   onChange={(e) => update("current_rank_label", e.target.value)}
-                   required
-                  >
-                    <option value="">Select a rank</option>
-                    {r6Ranks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={form.scrim_experience}
+                      onChange={(e) =>
+                        update("scrim_experience", e.target.checked)
+                      }
+                    />
+                    Scrim experience
+                  </label>
+                </div>
+              </div>
+            )}
 
-                ) : form.game_slug === "rocket-league" ? (
-                  <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                  value={form.current_rank_label}
-                  onChange={(e) => update("current_rank_label", e.target.value)}
+            {form.game_slug !== "smash" && (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {form.game_slug === "fortnite" && (
+                  <div>
+                    <label className="text-sm text-neutral-300">Fortnite Mode</label>
+                    <select
+                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      value={form.fortnite_mode}
+                      onChange={(e) => update("fortnite_mode", e.target.value)}
+                      required
+                    >
+                      <option value="">Select a mode</option>
+                      <option value="builds">Builds</option>
+                      <option value="zero_builds">Zero Builds</option>
+                    </select>
+                  </div>
+                )}
+                <Input
+                  label="In-Game Name"
+                  value={form.ign}
+                  onChange={(v) => update("ign", v)}
                   required
-                  >
-                    <option value="">Select a rank</option>
-                    {rocketLeagueRanks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
+                />
 
-                ) : form.game_slug === "overwatch" ? (
-                  <select
+                <div>
+                  <label className="text-sm text-neutral-300">Current Rank</label>
+
+                  {form.game_slug === "valorant" ? (
+                    <select
+                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      value={form.current_rank_label}
+                      onChange={(e) =>
+                        update("current_rank_label", e.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select a rank</option>
+                      {valorantRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
+                  ) : form.game_slug === "fortnite" ? (
+                    <select
+                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      value={form.current_rank_label}
+                      onChange={(e) => update("current_rank_label", e.target.value)}
+                      required
+                    >
+                      <option value="">Select a rank</option>
+                      {fortniteRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
+                  ) : form.game_slug === "r6" ? (
+                    <select
                     className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
-                  >
-                    <option value="">Select a rank</option>
-                      {overwatchRanks.map((rank) => (
+                    >
+                      <option value="">Select a rank</option>
+                      {r6Ranks.map((rank) => (
                         <option key={rank} value={rank}>
                           {rank}
                         </option>
                       ))}
                     </select>
 
-                ) : form.game_slug === "cod" ? (
-                  <select
+                  ) : form.game_slug === "rocket-league" ? (
+                    <select
                     className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
-                  >
-                    <option value="">Select a rank</option>
-                    {codRanks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
+                    >
+                      <option value="">Select a rank</option>
+                      {rocketLeagueRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
 
-                ) : form.game_slug === "hearthstone" ? (
-                  <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                    value={form.current_rank_label}
-                    onChange={(e) => update("current_rank_label", e.target.value)}
-                    required
-                  >
-                    <option value="">Select a rank</option>
-                    {hearthstoneRanks.map((rank) => (
-                      <option key={rank} value={rank}>
-                        {rank}
-                      </option>
-                    ))}
-                  </select>
-                  
-                ) : (
-                  <>
-                    <input
+                  ) : form.game_slug === "overwatch" ? (
+                    <select
                       className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
                       value={form.current_rank_label}
-                      onChange={(e) =>
-                        update("current_rank_label", e.target.value)
-                      }
-                      placeholder="Example: Faceit 7 or Premier 18500"
+                      onChange={(e) => update("current_rank_label", e.target.value)}
                       required
-                    />
-                    <p className="mt-1 text-xs text-neutral-500">
-                      Examples: {cs2RankExamples.join(", ")}
-                    </p>
+                    >
+                      <option value="">Select a rank</option>
+                        {overwatchRanks.map((rank) => (
+                          <option key={rank} value={rank}>
+                            {rank}
+                          </option>
+                        ))}
+                      </select>
+
+                  ) : form.game_slug === "cod" ? (
+                    <select
+                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      value={form.current_rank_label}
+                      onChange={(e) => update("current_rank_label", e.target.value)}
+                      required
+                    >
+                      <option value="">Select a rank</option>
+                      {codRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
+
+                  ) : form.game_slug === "hearthstone" ? (
+                    <select
+                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      value={form.current_rank_label}
+                      onChange={(e) => update("current_rank_label", e.target.value)}
+                      required
+                    >
+                      <option value="">Select a rank</option>
+                      {hearthstoneRanks.map((rank) => (
+                        <option key={rank} value={rank}>
+                          {rank}
+                        </option>
+                      ))}
+                    </select>
+                    
+                  ) : (
+                    <>
+                      <input
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                        value={form.current_rank_label}
+                        onChange={(e) =>
+                          update("current_rank_label", e.target.value)
+                        }
+                        placeholder="Example: Faceit 7 or Premier 18500"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Examples: {cs2RankExamples.join(", ")}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <Input
+                  label="Peak Rank"
+                  value={form.peak_rank_label}
+                  onChange={(v) => update("peak_rank_label", v)}
+                />
+
+                  <>
+                    <div>
+                      <label className="text-sm text-neutral-300">Primary Role</label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                        value={form.primary_role}
+                        onChange={(e) => update("primary_role", e.target.value)}
+                        required
+                      >
+                        <option value="">Select a role</option>
+                        {roleOptions.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-neutral-300">
+                        Secondary Role
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                        value={form.secondary_role}
+                        onChange={(e) => update("secondary_role", e.target.value)}
+                      >
+                        <option value="">Select a role</option>
+                        {roleOptions.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </>
-                )}
-              </div>
+                
 
-              <Input
-                label="Peak Rank"
-                value={form.peak_rank_label}
-                onChange={(v) => update("peak_rank_label", v)}
-              />
+                <Input
+                  label="Tracker / Profile URL"
+                  value={form.tracker_url}
+                  onChange={(v) => update("tracker_url", v)}
+                />
 
-              <div>
-                <label className="text-sm text-neutral-300">Primary Role</label>
-                <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                  value={form.primary_role}
-                  onChange={(e) => update("primary_role", e.target.value)}
-                  required
-                >
-                  <option value="">Select a role</option>
-                  {roleOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm text-neutral-300">
-                  Secondary Role
-                </label>
-                <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                  value={form.secondary_role}
-                  onChange={(e) => update("secondary_role", e.target.value)}
-                >
-                  <option value="">Select a role</option>
-                  {roleOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <Input
-                label="Tracker / Profile URL"
-                value={form.tracker_url}
-                onChange={(v) => update("tracker_url", v)}
-              />
-
-              <div>
-                <label className="text-sm text-neutral-300">
-                  Tournament Experience
-                </label>
-                <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                  value={form.tournament_experience}
-                  onChange={(e) =>
-                    update("tournament_experience", e.target.value)
-                  }
-                >
-                  <option value="none">None</option>
-                  <option value="local">Local</option>
-                  <option value="regional">Regional</option>
-                  <option value="national">National</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-3 pt-6">
-                <label className="flex items-center gap-2 text-sm text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={form.team_experience}
+                <div>
+                  <label className="text-sm text-neutral-300">
+                    Tournament Experience
+                  </label>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    value={form.tournament_experience}
                     onChange={(e) =>
-                      update("team_experience", e.target.checked)
+                      update("tournament_experience", e.target.value)
                     }
-                  />
-                  Team experience
-                </label>
+                  >
+                    <option value="none">None</option>
+                    <option value="local">Local</option>
+                    <option value="regional">Regional</option>
+                    <option value="national">National</option>
+                  </select>
+                </div>
 
-                <label className="flex items-center gap-2 text-sm text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={form.scrim_experience}
-                    onChange={(e) =>
-                      update("scrim_experience", e.target.checked)
-                    }
-                  />
-                  Scrim experience
-                </label>
+                <div className="flex flex-col gap-3 pt-6">
+                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={form.team_experience}
+                      onChange={(e) =>
+                        update("team_experience", e.target.checked)
+                      }
+                    />
+                    Team experience
+                  </label>
+
+                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={form.scrim_experience}
+                      onChange={(e) =>
+                        update("scrim_experience", e.target.checked)
+                      }
+                    />
+                    Scrim experience
+                  </label>
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           <div className="flex flex-col gap-3">

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 from typing import Optional, Literal
 from datetime import datetime
 
@@ -13,10 +13,10 @@ class AvailabilityInput(BaseModel):
 
 
 class RecruitProfileInput(BaseModel):
-    ign: str = Field(..., min_length=1, max_length=50)
-    current_rank_label: str = Field(..., min_length=1, max_length=50)
+    ign: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    current_rank_label:Optional[str] = Field(default=None, min_length=1, max_length=50)
     peak_rank_label: Optional[str] = Field(default=None, max_length=50)
-    primary_role: str = Field(..., min_length=1, max_length=50)
+    primary_role: Optional[str] = Field(default=None, min_length=1, max_length=50)
     secondary_role: Optional[str] = Field(default=None, max_length=100)
     tracker_url: Optional[str] = Field(default=None, max_length=255)
     team_experience: bool
@@ -29,6 +29,11 @@ class RecruitProfileInput(BaseModel):
     legend_peak_rank: Optional[int] = Field(default=None, ge=1, le=50000)
     preferred_format: Optional[str] = Field(default=None, max_length=50)
     other_card_games: Optional[str] = Field(default=None, max_length=255)
+    
+    gsp: Optional[int] = Field(default=None, ge=0, le=16000000)
+    regional_rank: Optional[str] = Field(default=None, max_length=100)
+    best_wins: Optional[str] = Field(default=None, max_length=500)
+    characters: Optional[str] = Field(default=None, max_length=500)
     
 
 
@@ -51,6 +56,7 @@ class RecruitApplyInput(BaseModel):
         "overwatch",
         "cod",
         "hearthstone",
+        "smash",
     ]
     profile: RecruitProfileInput
 
@@ -62,3 +68,15 @@ class RecruitApplyInput(BaseModel):
         if v < CURRENT_YEAR or v > CURRENT_YEAR + 6:
             raise ValueError(f"graduation_year must be between {CURRENT_YEAR} and {CURRENT_YEAR + 6}")
         return v
+    
+    @model_validator(mode="after")
+    def validate_profile_by_game(self):
+        if self.game_slug != "smash":
+            if not self.profile.ign:
+                raise ValueError("ign is required for this game")
+            if not self.profile.current_rank_label:
+                raise ValueError("current_rank_label is required for this game")
+            if not self.profile.primary_role:
+                raise ValueError("primary_role is required for this game")
+
+        return self
