@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from typing import Any
+
+from app.services.scoring.contracts import ScoringResult, make_component, make_explanation
 
 def mario_kart_rank_to_numeric(lounge_rating: int | None) -> float:
     if not lounge_rating:
@@ -85,7 +88,43 @@ def _completeness_score(
     return float(max(0.0, min(100.0, score)))
 
 
-def score_mario_kart(inputs: MarioKartInputs) -> tuple[float, dict]:
+def _build_inputs(payload: Any) -> tuple[MarioKartInputs, float, dict[str, Any]]:
+    current_rank_numeric = float(payload.profile.lounge_rating or 0)
+    return (
+        MarioKartInputs(
+            lounge_rating=payload.profile.lounge_rating,
+            hours_per_week=payload.availability.hours_per_week,
+            weeknights_available=payload.availability.weeknights_available,
+            weekends_available=payload.availability.weekends_available,
+            team_experience=payload.profile.team_experience,
+            scrim_experience=payload.profile.scrim_experience,
+            tournament_experience=payload.profile.tournament_experience,
+            tracker_url_present=bool(payload.profile.tracker_url),
+            ign_present=bool(payload.profile.ign),
+            preferred_title_present=bool(payload.profile.preferred_title),
+            controller_present=bool(payload.profile.controller_type),
+            playstyle_present=bool(payload.profile.playstyle),
+        ),
+        current_rank_numeric,
+        {
+            "lounge_rating": payload.profile.lounge_rating,
+            "hours_per_week": payload.availability.hours_per_week,
+            "weeknights_available": payload.availability.weeknights_available,
+            "weekends_available": payload.availability.weekends_available,
+            "team_experience": payload.profile.team_experience,
+            "scrim_experience": payload.profile.scrim_experience,
+            "tournament_experience": payload.profile.tournament_experience,
+            "tracker_url_present": bool(payload.profile.tracker_url),
+            "ign_present": bool(payload.profile.ign),
+            "preferred_title_present": bool(payload.profile.preferred_title),
+            "controller_present": bool(payload.profile.controller_type),
+            "playstyle_present": bool(payload.profile.playstyle),
+        },
+    )
+
+
+def score_mario_kart(payload: Any) -> ScoringResult:
+    inputs, current_rank_numeric, raw_inputs = _build_inputs(payload)
     rank = mario_kart_rank_to_numeric(inputs.lounge_rating)
     availability = _availability_score(
         inputs.hours_per_week,
@@ -112,17 +151,28 @@ def score_mario_kart(inputs: MarioKartInputs) -> tuple[float, dict]:
         0.15 * complete
     )
 
-    explanation = {
-        "lounge_rating": round(0.40 * rank, 2),
-        "experience": round(0.25 * experience, 2),
-        "availability": round(0.20 * availability, 2),
-        "completeness": round(0.15 * complete, 2),
-        "raw": {
+    explanation = make_explanation(
+        {
+            "skill": make_component(rank, 0.40),
+            "experience": make_component(experience, 0.25),
+            "availability": make_component(availability, 0.20),
+            "completeness": make_component(complete, 0.15),
+        },
+        total,
+    )
+
+    return ScoringResult(
+        score=round(float(total), 2),
+        explanation=explanation,
+        model_version="v1_mario_kart",
+        scoring_method="rules",
+        raw_inputs=raw_inputs,
+        normalized_features={
             "lounge_rating_score": rank,
             "experience": experience,
             "availability": availability,
             "completeness": complete,
         },
-    }
-
-    return round(float(total), 2), explanation
+        current_rank_numeric=current_rank_numeric,
+        peak_rank_numeric=None,
+    )
