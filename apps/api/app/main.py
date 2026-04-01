@@ -27,7 +27,14 @@ app.include_router(recruits_admin.router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
 # Database
-Base.metadata.create_all(bind=engine)
+auto_create_tables = os.getenv("AUTO_CREATE_TABLES", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+if auto_create_tables:
+    Base.metadata.create_all(bind=engine)
 
 # CORS
 origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")]

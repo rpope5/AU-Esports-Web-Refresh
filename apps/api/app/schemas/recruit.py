@@ -78,7 +78,7 @@ class RecruitApplyInput(BaseModel):
     
     @model_validator(mode="after")
     def validate_profile_by_game(self):
-        if self.game_slug != "smash":
+        if self.game_slug not in {"smash", "mario-kart"}:
             if not self.profile.ign:
                 raise ValueError("ign is required for this game")
             if not self.profile.current_rank_label:
