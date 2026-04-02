@@ -55,7 +55,8 @@ def list_recruits_for_game(
         .outerjoin(
             RecruitRanking,
             (RecruitRanking.application_id == RecruitApplication.id)
-            & (RecruitRanking.game_id == game.id),
+            & (RecruitRanking.game_id == game.id)
+            & (RecruitRanking.is_current.is_(True)),
         )
         .outerjoin(
             RecruitReview,
@@ -95,6 +96,15 @@ def list_recruits_for_game(
                 "scrim_experience": profile.scrim_experience,
                 "tournament_experience": profile.tournament_experience,
                 "score": ranking.score if ranking else None,
+                "score_model_version": ranking.model_version if ranking else None,
+                "score_scoring_method": ranking.scoring_method if ranking else None,
+                "score_scored_at": ranking.scored_at if ranking else None,
+                "score_is_current": ranking.is_current if ranking else None,
+                "score_components": (
+                    ranking.explanation_json.get("components")
+                    if ranking and isinstance(ranking.explanation_json, dict)
+                    else None
+                ),
                 "status": review.status if review else "NEW",
             }
         )
@@ -132,6 +142,11 @@ def get_recruit_detail(
     rankings = (
         db.query(RecruitRanking)
         .filter(RecruitRanking.application_id == application_id)
+        .order_by(
+            RecruitRanking.is_current.desc(),
+            RecruitRanking.scored_at.desc(),
+            RecruitRanking.id.desc(),
+        )
         .all()
     )
 
@@ -140,6 +155,8 @@ def get_recruit_detail(
         .filter(RecruitReview.application_id == application_id)
         .first()
     )
+
+    current_ranking = next((r for r in rankings if r.is_current), None)
 
     return {
         "application": {
@@ -198,9 +215,29 @@ def get_recruit_detail(
                 "score": r.score,
                 "explanation_json": r.explanation_json,
                 "model_version": r.model_version,
+                "raw_inputs_json": r.raw_inputs_json,
+                "normalized_features_json": r.normalized_features_json,
+                "scoring_method": r.scoring_method,
+                "is_current": r.is_current,
+                "scored_at": r.scored_at,
             }
             for r in rankings
         ],
+        "current_ranking": (
+            {
+                "game_id": current_ranking.game_id,
+                "score": current_ranking.score,
+                "explanation_json": current_ranking.explanation_json,
+                "model_version": current_ranking.model_version,
+                "raw_inputs_json": current_ranking.raw_inputs_json,
+                "normalized_features_json": current_ranking.normalized_features_json,
+                "scoring_method": current_ranking.scoring_method,
+                "is_current": current_ranking.is_current,
+                "scored_at": current_ranking.scored_at,
+            }
+            if current_ranking
+            else None
+        ),
         "review": {
             "status": review.status if review else "NEW",
             "notes": review.notes if review else None,

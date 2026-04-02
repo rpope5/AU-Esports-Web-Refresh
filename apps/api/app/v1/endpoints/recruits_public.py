@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.db.session import SessionLocal
 from app.schemas.recruit import RecruitApplyInput
@@ -95,6 +96,16 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
     db.add(profile)
     db.commit()
 
+    (
+        db.query(RecruitRanking)
+        .filter(
+            RecruitRanking.application_id == app_obj.id,
+            RecruitRanking.game_id == game.id,
+            RecruitRanking.is_current.is_(True),
+        )
+        .update({"is_current": False}, synchronize_session=False)
+    )
+
     # Save ranking
     ranking = RecruitRanking(
         application_id=app_obj.id,
@@ -102,6 +113,11 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
         score=scoring_result.score,
         explanation_json=scoring_result.explanation,
         model_version=scoring_result.model_version,
+        raw_inputs_json=scoring_result.raw_inputs,
+        normalized_features_json=scoring_result.normalized_features,
+        scoring_method=scoring_result.scoring_method,
+        is_current=True,
+        scored_at=datetime.utcnow(),
     )
 
     db.add(ranking)

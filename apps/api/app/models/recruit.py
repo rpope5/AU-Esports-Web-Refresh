@@ -76,10 +76,15 @@ class RecruitRanking(Base):
 
     id = Column(Integer, primary_key=True)
     application_id = Column(Integer, ForeignKey("recruit_applications.id"))
-    game_id = Column(Integer)
+    game_id = Column(Integer, ForeignKey("games.id"))
     score = Column(Float)
     explanation_json = Column(JSON)
     model_version = Column(String)
+    raw_inputs_json = Column(JSON, nullable=False, default=dict)
+    normalized_features_json = Column(JSON, nullable=False, default=dict)
+    scoring_method = Column(String, nullable=False, default="rules")
+    is_current = Column(Boolean, nullable=False, default=True)
+    scored_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     
 class RecruitReview(Base):
