@@ -30,6 +30,7 @@ type ApplicationData = {
   last_name?: string;
   email?: string;
   discord?: string;
+  created_at?: string;
 };
 
 type AvailabilityData = {
@@ -73,6 +74,24 @@ type RecruitDetailResponse = {
 
 function prettyKey(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function parseBackendTimestamp(value?: string): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(trimmed);
+  const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatTimestampLocal(value?: string): string {
+  const parsed = parseBackendTimestamp(value);
+  if (!parsed) return "N/A";
+  return parsed.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function formatValue(value: unknown): string {
@@ -224,6 +243,7 @@ export default function RecruitDetailPage() {
         </h1>
         <p className="text-neutral-400">{app.email}</p>
         <p className="text-neutral-400">{app.discord}</p>
+        <p className="text-sm text-neutral-500">Submitted: {formatTimestampLocal(app.created_at)}</p>
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
@@ -318,9 +338,7 @@ export default function RecruitDetailPage() {
             </p>
             <p className="mt-1 text-sm text-neutral-400">
               Scored At:{" "}
-              <span className="text-white">
-                {ranking?.scored_at ? new Date(ranking.scored_at).toLocaleString() : "N/A"}
-              </span>
+              <span className="text-white">{formatTimestampLocal(ranking?.scored_at)}</span>
             </p>
             <p className="mt-3 text-sm text-neutral-400">
               Status: <span className="text-white">{review?.status || "NEW"}</span>
