@@ -69,12 +69,38 @@ type RecruitDetailResponse = {
   profiles?: ProfileData[];
   rankings?: RankingDetail[];
   current_ranking?: RankingDetail | null;
-  review?: { status?: string; notes?: string | null };
+  review?: {
+    status?: RecruitReviewStatus;
+    notes?: string | null;
+    label_reason?: string | null;
+    labeled_at?: string | null;
+    reviewer_user_id?: number | null;
+    reviewer_username?: string | null;
+  };
 };
 
 function prettyKey(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
+
+type RecruitReviewStatus =
+  | "NEW"
+  | "REVIEWED"
+  | "CONTACTED"
+  | "TRYOUT"
+  | "WATCHLIST"
+  | "ACCEPTED"
+  | "REJECTED";
+
+const REVIEW_STATUS_OPTIONS: RecruitReviewStatus[] = [
+  "NEW",
+  "REVIEWED",
+  "CONTACTED",
+  "TRYOUT",
+  "WATCHLIST",
+  "ACCEPTED",
+  "REJECTED",
+];
 
 function parseBackendTimestamp(value?: string): Date | null {
   if (!value) return null;
@@ -128,7 +154,8 @@ export default function RecruitDetailPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [data, setData] = useState<RecruitDetailResponse | null>(null);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<RecruitReviewStatus>("NEW");
+  const [labelReason, setLabelReason] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -151,7 +178,8 @@ export default function RecruitDetailPage() {
 
       const result = await res.json();
       setData(result);
-      setStatus(result.review?.status || "NEW");
+      setStatus((result.review?.status as RecruitReviewStatus) || "NEW");
+      setLabelReason(result.review?.label_reason || "");
       setNotes(result.review?.notes || "");
     })();
   }, [apiUrl, params.id, router]);
@@ -162,14 +190,42 @@ export default function RecruitDetailPage() {
 
     setSaving(true);
     try {
-      await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}/status`, {
+      const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          label_reason: labelReason.trim() ? labelReason.trim() : null,
+        }),
       });
+
+      if (res.ok) {
+        const payload = (await res.json()) as {
+          status?: RecruitReviewStatus;
+          label_reason?: string | null;
+          labeled_at?: string | null;
+          reviewer_user_id?: number | null;
+          reviewer_username?: string | null;
+        };
+
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            review: {
+              ...prev.review,
+              status: payload.status || status,
+              label_reason: payload.label_reason ?? null,
+              labeled_at: payload.labeled_at ?? null,
+              reviewer_user_id: payload.reviewer_user_id ?? null,
+              reviewer_username: payload.reviewer_username ?? null,
+            },
+          };
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -234,6 +290,7 @@ export default function RecruitDetailPage() {
   const availability = data.availability;
   const profile = data.profiles?.[0];
   const review = data.review;
+  const reviewerDisplay = review?.reviewer_username || (review?.reviewer_user_id ? `User #${review.reviewer_user_id}` : "N/A");
 
   return (
     <div className="p-6 space-y-6">
@@ -341,7 +398,16 @@ export default function RecruitDetailPage() {
               <span className="text-white">{formatTimestampLocal(ranking?.scored_at)}</span>
             </p>
             <p className="mt-3 text-sm text-neutral-400">
-              Status: <span className="text-white">{review?.status || "NEW"}</span>
+              Status: <span className="text-white">{status || review?.status || "NEW"}</span>
+            </p>
+            <p className="mt-1 text-sm text-neutral-400">
+              Labeled At: <span className="text-white">{formatTimestampLocal(review?.labeled_at || undefined)}</span>
+            </p>
+            <p className="mt-1 text-sm text-neutral-400">
+              Labeled By: <span className="text-white">{reviewerDisplay}</span>
+            </p>
+            <p className="mt-1 text-sm text-neutral-400">
+              Label Reason: <span className="text-white">{review?.label_reason || "N/A"}</span>
             </p>
           </div>
 
@@ -389,15 +455,21 @@ export default function RecruitDetailPage() {
             <select
               className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => setStatus(e.target.value as RecruitReviewStatus)}
             >
-              <option value="NEW">NEW</option>
-              <option value="REVIEWED">REVIEWED</option>
-              <option value="CONTACTED">CONTACTED</option>
-              <option value="TRYOUT">TRYOUT</option>
-              <option value="ACCEPTED">ACCEPTED</option>
-              <option value="REJECTED">REJECTED</option>
+              {REVIEW_STATUS_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
+            <label className="mt-3 block text-sm text-neutral-400">Label Reason (Optional)</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+              value={labelReason}
+              onChange={(e) => setLabelReason(e.target.value)}
+              placeholder="Reason for this status/label"
+            />
             <button onClick={saveStatus} className="mt-2 rounded-lg bg-white px-4 py-2 text-black" disabled={saving}>
               Save Status
             </button>

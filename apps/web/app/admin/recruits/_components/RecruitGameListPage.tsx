@@ -10,6 +10,25 @@ type ScoreComponent = {
   contribution?: number;
 };
 
+type RecruitReviewStatus =
+  | "NEW"
+  | "REVIEWED"
+  | "CONTACTED"
+  | "TRYOUT"
+  | "WATCHLIST"
+  | "ACCEPTED"
+  | "REJECTED";
+
+const REVIEW_STATUS_OPTIONS: RecruitReviewStatus[] = [
+  "NEW",
+  "REVIEWED",
+  "CONTACTED",
+  "TRYOUT",
+  "WATCHLIST",
+  "ACCEPTED",
+  "REJECTED",
+];
+
 type Recruit = {
   application_id: number;
   first_name: string;
@@ -24,7 +43,9 @@ type Recruit = {
   secondary_role: string | null;
   tracker_url: string | null;
   score: number | null;
-  status: string;
+  status: RecruitReviewStatus;
+  review_labeled_at?: string | null;
+  reviewer_username?: string | null;
   score_model_version?: string | null;
   score_scoring_method?: string | null;
   score_scored_at?: string | null;
@@ -42,6 +63,24 @@ type Props = {
 
 function prettyKey(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function parseBackendTimestamp(value?: string | null): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(trimmed);
+  const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatTimestampShort(value?: string | null): string {
+  const parsed = parseBackendTimestamp(value);
+  if (!parsed) return "Not labeled";
+  return parsed.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function reasonPreview(components?: Record<string, ScoreComponent> | null): string {
@@ -63,7 +102,7 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
   const [err, setErr] = useState<string | null>(null);
 
   const [sortBy, setSortBy] = useState<SortOption>("score_desc");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | RecruitReviewStatus>("");
   const [minScoreInput, setMinScoreInput] = useState("");
 
   useEffect(() => {
@@ -183,15 +222,14 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
           <select
             className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 p-2 text-sm"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => setStatusFilter(e.target.value as "" | RecruitReviewStatus)}
           >
             <option value="">All</option>
-            <option value="NEW">NEW</option>
-            <option value="REVIEWED">REVIEWED</option>
-            <option value="CONTACTED">CONTACTED</option>
-            <option value="TRYOUT">TRYOUT</option>
-            <option value="ACCEPTED">ACCEPTED</option>
-            <option value="REJECTED">REJECTED</option>
+            {REVIEW_STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -229,6 +267,8 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
                   <div className="text-sm text-neutral-400">Score</div>
                   <div className="text-2xl font-semibold">{r.score ?? "--"}</div>
                   <div className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{r.status}</div>
+                  <div className="mt-1 text-xs text-neutral-500">Labeled: {formatTimestampShort(r.review_labeled_at)}</div>
+                  <div className="mt-1 text-xs text-neutral-500">By: {r.reviewer_username || "N/A"}</div>
                   {r.score_model_version && (
                     <div className="mt-1 text-xs text-neutral-600">
                       {r.score_scoring_method || "rules"} | {r.score_model_version}

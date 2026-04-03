@@ -1,10 +1,21 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 from typing import Any
 
+RecruitReviewStatus = Literal[
+    "NEW",
+    "REVIEWED",
+    "CONTACTED",
+    "TRYOUT",
+    "WATCHLIST",
+    "ACCEPTED",
+    "REJECTED",
+]
+
 class RecruitStatusUpdate(BaseModel):
-    status: str
+    status: RecruitReviewStatus
+    label_reason: Optional[str] = None
 
 class RecruitNotesUpdate(BaseModel):
     notes: Optional[str] = None

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.core.deps import require_admin
+from app.models.admin_user import AdminUser
 from app.models.game import Game
 from app.models.recruit import (
     RecruitApplication,
@@ -10,6 +12,7 @@ from app.models.recruit import (
     RecruitGameProfile,
     RecruitRanking,
     RecruitReview,
+    RECRUIT_REVIEW_STATUSES,
 )
 from app.schemas.admin import RecruitStatusUpdate, RecruitNotesUpdate
 from datetime import datetime
@@ -32,6 +35,10 @@ def list_recruits_for_game(
     db: Session = Depends(get_db),
     user=Depends(require_admin),
 ):
+    normalized_status = status.upper() if status else None
+    if normalized_status and normalized_status not in RECRUIT_REVIEW_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
     game = db.query(Game).filter(Game.slug == game_slug).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -43,6 +50,7 @@ def list_recruits_for_game(
             RecruitGameProfile,
             RecruitRanking,
             RecruitReview,
+            AdminUser.username,
         )
         .join(
             RecruitGameProfile,
@@ -62,11 +70,20 @@ def list_recruits_for_game(
             RecruitReview,
             RecruitReview.application_id == RecruitApplication.id,
         )
+        .outerjoin(
+            AdminUser,
+            AdminUser.id == RecruitReview.reviewer_user_id,
+        )
         .filter(RecruitGameProfile.game_id == game.id)
     )
 
-    if status:
-        query = query.filter(RecruitReview.status == status.upper())
+    if normalized_status:
+        if normalized_status == "NEW":
+            query = query.filter(
+                or_(RecruitReview.status == normalized_status, RecruitReview.status.is_(None))
+            )
+        else:
+            query = query.filter(RecruitReview.status == normalized_status)
 
     if min_score is not None:
         query = query.filter(RecruitRanking.score >= min_score)
@@ -74,7 +91,7 @@ def list_recruits_for_game(
     rows = query.all()
 
     results = []
-    for app, avail, profile, ranking, review in rows:
+    for app, avail, profile, ranking, review, reviewer_username in rows:
         results.append(
             {
                 "application_id": app.id,
@@ -106,6 +123,8 @@ def list_recruits_for_game(
                     else None
                 ),
                 "status": review.status if review else "NEW",
+                "review_labeled_at": review.labeled_at if review else None,
+                "reviewer_username": reviewer_username,
             }
         )
 
@@ -155,6 +174,13 @@ def get_recruit_detail(
         .filter(RecruitReview.application_id == application_id)
         .first()
     )
+    reviewer_username = None
+    if review and review.reviewer_user_id is not None:
+        reviewer_username = (
+            db.query(AdminUser.username)
+            .filter(AdminUser.id == review.reviewer_user_id)
+            .scalar()
+        )
 
     current_ranking = next((r for r in rankings if r.is_current), None)
 
@@ -241,6 +267,10 @@ def get_recruit_detail(
         "review": {
             "status": review.status if review else "NEW",
             "notes": review.notes if review else None,
+            "label_reason": review.label_reason if review else None,
+            "labeled_at": review.labeled_at if review else None,
+            "reviewer_user_id": review.reviewer_user_id if review else None,
+            "reviewer_username": reviewer_username,
         },
     }
     
@@ -251,6 +281,27 @@ def update_recruit_status(
     db: Session = Depends(get_db),
     user=Depends(require_admin),
 ):
+    app_exists = (
+        db.query(RecruitApplication.id)
+        .filter(RecruitApplication.id == application_id)
+        .first()
+    )
+    if not app_exists:
+        raise HTTPException(status_code=404, detail="Recruit not found")
+
+    reviewer_user_id = None
+    reviewer_username = user.get("sub")
+    if reviewer_username:
+        reviewer = (
+            db.query(AdminUser)
+            .filter(AdminUser.username == reviewer_username)
+            .first()
+        )
+        reviewer_user_id = reviewer.id if reviewer else None
+
+    now = datetime.utcnow()
+    label_reason = data.label_reason.strip() if data.label_reason and data.label_reason.strip() else None
+
     review = (
         db.query(RecruitReview)
         .filter(RecruitReview.application_id == application_id)
@@ -260,18 +311,30 @@ def update_recruit_status(
     if not review:
         review = RecruitReview(
             application_id=application_id,
-            status=data.status.upper(),
-            reviewer_user_id=None,
+            status=data.status,
+            reviewer_user_id=reviewer_user_id,
+            labeled_at=now,
+            label_reason=label_reason,
             notes=None,
-            updated_at=datetime.utcnow(),
+            updated_at=now,
         )
         db.add(review)
     else:
-        review.status = data.status.upper()
-        review.updated_at = datetime.utcnow()
+        review.status = data.status
+        review.reviewer_user_id = reviewer_user_id
+        review.labeled_at = now
+        review.label_reason = label_reason
+        review.updated_at = now
 
     db.commit()
-    return {"message": "Status updated", "status": review.status}
+    return {
+        "message": "Status updated",
+        "status": review.status,
+        "label_reason": review.label_reason,
+        "labeled_at": review.labeled_at,
+        "reviewer_user_id": review.reviewer_user_id,
+        "reviewer_username": reviewer_username,
+    }
 
 @router.patch("/admin/recruit/{application_id}/notes")
 def update_recruit_notes(
@@ -291,6 +354,8 @@ def update_recruit_notes(
             application_id=application_id,
             status="NEW",
             reviewer_user_id=None,
+            labeled_at=None,
+            label_reason=None,
             notes=data.notes,
             updated_at=datetime.utcnow(),
         )

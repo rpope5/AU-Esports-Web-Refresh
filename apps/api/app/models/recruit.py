@@ -3,6 +3,16 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
 
+RECRUIT_REVIEW_STATUSES = (
+    "NEW",
+    "REVIEWED",
+    "CONTACTED",
+    "TRYOUT",
+    "WATCHLIST",
+    "ACCEPTED",
+    "REJECTED",
+)
+
 class RecruitApplication(Base):
     __tablename__ = "recruit_applications"
 
@@ -92,8 +102,10 @@ class RecruitReview(Base):
 
     id = Column(Integer, primary_key=True)
     application_id = Column(Integer, ForeignKey("recruit_applications.id"))
-    status = Column(String, default="NEW")
+    status = Column(String, nullable=False, default="NEW")
     reviewer_user_id = Column(Integer, nullable=True)
+    labeled_at = Column(DateTime, nullable=True)
+    label_reason = Column(String, nullable=True)
     notes = Column(String, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
