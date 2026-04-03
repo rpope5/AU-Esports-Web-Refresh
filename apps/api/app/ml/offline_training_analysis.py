@@ -11,7 +11,9 @@ Core outputs:
 - Label distribution by game
 - Score distribution by review status
 - Rules score vs coach outcome comparison for two binary target definitions
-- Optional score-only logistic regression baseline (if scikit-learn is installed)
+- Per-game triage-positive evaluation (AUC, thresholds, sample size)
+- Optional logistic regression experiment using:
+  score + selected normalized numeric features + game_slug
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ KNOWN_STATUSES = {
     "ACCEPTED",
     "REJECTED",
 }
+DEFAULT_THRESHOLDS = [50.0, 60.0, 70.0, 80.0, 90.0]
 
 
 @dataclass
@@ -53,6 +56,7 @@ class ParsedRow:
     scored_at: str | None
     submitted_at: str | None
     label_reason: str | None
+    normalized_features: dict[str, Any]
     raw: dict[str, Any]
 
 
@@ -90,7 +94,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--run-logistic",
         action="store_true",
-        help="Run optional score-only logistic regression baseline if sklearn is available.",
+        help="Run optional logistic regression experiment (offline only).",
+    )
+    parser.add_argument(
+        "--min-game-sample",
+        type=int,
+        default=5,
+        help="Minimum per-game rows (with scores) to treat game-level AUC as comparable.",
+    )
+    parser.add_argument(
+        "--norm-min-coverage",
+        type=float,
+        default=0.3,
+        help="Minimum coverage ratio for selecting normalized numeric features.",
+    )
+    parser.add_argument(
+        "--max-norm-features",
+        type=int,
+        default=10,
+        help="Max number of normalized numeric features to include in logistic experiment.",
     )
     parser.add_argument(
         "--output-json",
@@ -167,6 +189,10 @@ def parse_rows(payload: dict[str, Any]) -> list[ParsedRow]:
         else:
             score = float(score)
 
+        normalized = row.get("normalized_features_json")
+        if not isinstance(normalized, dict):
+            normalized = {}
+
         parsed.append(
             ParsedRow(
                 application_id=application_id,
@@ -176,6 +202,7 @@ def parse_rows(payload: dict[str, Any]) -> list[ParsedRow]:
                 scored_at=row.get("scored_at"),
                 submitted_at=row.get("submitted_at"),
                 label_reason=row.get("label_reason"),
+                normalized_features=normalized,
                 raw=row,
             )
         )
@@ -271,12 +298,14 @@ def threshold_metrics(y_true: list[int], y_score: list[float], threshold: float)
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
     specificity = tn / (tn + fp) if (tn + fp) else 0.0
+    hit_rate = (tp + fp) / len(y_true) if y_true else 0.0
     return {
         "threshold": threshold,
         "tp": tp,
         "fp": fp,
         "tn": tn,
         "fn": fn,
+        "hit_rate_pct": round(hit_rate * 100.0, 2),
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "specificity": round(specificity, 4),
@@ -293,8 +322,6 @@ def compare_rules_score(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
     pos_scores = [s for y, s in zip(y_true, y_score) if y == 1]
     neg_scores = [s for y, s in zip(y_true, y_score) if y == 0]
 
-    thresholds = [50.0, 60.0, 70.0, 80.0, 90.0]
-
     return {
         "target_mode": mode,
         "rows_with_score": len(labeled_rows),
@@ -304,7 +331,7 @@ def compare_rules_score(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
         "positive_score_summary": summarize_score_distribution(pos_scores),
         "negative_score_summary": summarize_score_distribution(neg_scores),
         "score_auc_vs_target": auc_from_scores(y_true, y_score),
-        "threshold_table": [threshold_metrics(y_true, y_score, t) for t in thresholds],
+        "threshold_table": [threshold_metrics(y_true, y_score, t) for t in DEFAULT_THRESHOLDS],
     }
 
 
@@ -338,15 +365,97 @@ def score_distribution_by_status(rows: list[ParsedRow]) -> dict[str, Any]:
     return result
 
 
-def run_optional_logistic(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
-    try:
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.metrics import (
-            accuracy_score,
-            precision_score,
-            recall_score,
-            roc_auc_score,
+def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int) -> dict[str, Any]:
+    by_game_rows: dict[str, list[ParsedRow]] = defaultdict(list)
+    for row in rows:
+        if row.score is not None:
+            by_game_rows[row.game_slug].append(row)
+
+    by_game: dict[str, Any] = {}
+    auc_candidates: list[tuple[str, float, int]] = []
+
+    for game, game_rows in sorted(by_game_rows.items()):
+        y_true = [target_value(r.review_status, "triage_positive") for r in game_rows]
+        y_score = [float(r.score) for r in game_rows if r.score is not None]
+        positives = sum(y_true)
+        negatives = len(y_true) - positives
+        score_auc = auc_from_scores(y_true, y_score)
+        score_distribution = summarize_score_distribution(y_score)
+        threshold_table = [threshold_metrics(y_true, y_score, t) for t in DEFAULT_THRESHOLDS]
+
+        auc_is_comparable = (
+            len(game_rows) >= min_game_sample and positives > 0 and negatives > 0 and score_auc is not None
         )
+        if auc_is_comparable:
+            auc_candidates.append((game, score_auc, len(game_rows)))
+
+        by_game[game] = {
+            "sample_size": len(game_rows),
+            "positives": positives,
+            "negatives": negatives,
+            "positive_rate_pct": round(pct(positives, len(game_rows)), 2),
+            "triage_positive_auc": score_auc,
+            "auc_comparable": auc_is_comparable,
+            "score_distribution": score_distribution,
+            "threshold_hit_rates": threshold_table,
+        }
+
+    auc_candidates.sort(key=lambda item: item[1], reverse=True)
+    strongest = [
+        {"game": game, "auc": auc, "sample_size": n}
+        for game, auc, n in auc_candidates[:3]
+    ]
+    weakest = [
+        {"game": game, "auc": auc, "sample_size": n}
+        for game, auc, n in auc_candidates[-3:]
+    ]
+
+    return {
+        "min_game_sample_for_comparable_auc": min_game_sample,
+        "by_game": by_game,
+        "strongest_games_by_auc": strongest,
+        "weakest_games_by_auc": weakest,
+    }
+
+
+def select_numeric_normalized_feature_keys(
+    rows: list[ParsedRow], min_coverage_ratio: float, max_features: int
+) -> list[dict[str, Any]]:
+    total_rows = len(rows)
+    numeric_counts: Counter[str] = Counter()
+    numeric_values: dict[str, list[float]] = defaultdict(list)
+
+    for row in rows:
+        for key, value in row.normalized_features.items():
+            if isinstance(value, (int, float)):
+                numeric_counts[key] += 1
+                numeric_values[key].append(float(value))
+
+    candidates: list[dict[str, Any]] = []
+    for key, count in numeric_counts.items():
+        coverage = (count / total_rows) if total_rows else 0.0
+        if coverage < min_coverage_ratio:
+            continue
+        vals = numeric_values[key]
+        variance = statistics.pvariance(vals) if len(vals) > 1 else 0.0
+        candidates.append(
+            {
+                "key": key,
+                "count": count,
+                "coverage_ratio": round(coverage, 4),
+                "variance": round(float(variance), 6),
+            }
+        )
+
+    candidates.sort(key=lambda row: (row["count"], row["variance"], row["key"]), reverse=True)
+    return candidates[:max_features]
+
+
+def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Namespace) -> dict[str, Any]:
+    try:
+        from sklearn.feature_extraction import DictVectorizer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.metrics import confusion_matrix, precision_score, recall_score, roc_auc_score
         from sklearn.model_selection import train_test_split
     except ImportError:
         return {
@@ -361,8 +470,27 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
             "reason": "Not enough rows with score for a stable train/test split (need ~30+).",
         }
 
-    X = [[float(r.score)] for r in labeled_rows]
-    y = [target_value(r.review_status, mode) for r in labeled_rows]
+    feature_candidates = select_numeric_normalized_feature_keys(
+        labeled_rows,
+        min_coverage_ratio=args.norm_min_coverage,
+        max_features=args.max_norm_features,
+    )
+    selected_keys = [row["key"] for row in feature_candidates]
+
+    X_dict: list[dict[str, Any]] = []
+    y: list[int] = []
+    for row in labeled_rows:
+        feature_row: dict[str, Any] = {
+            "score": float(row.score),
+            "game_slug": row.game_slug,
+        }
+        for key in selected_keys:
+            value = row.normalized_features.get(key)
+            if isinstance(value, (int, float)):
+                feature_row[f"norm__{key}"] = float(value)
+        X_dict.append(feature_row)
+        y.append(target_value(row.review_status, mode))
+
     positives = sum(y)
     negatives = len(y) - positives
     if positives == 0 or negatives == 0:
@@ -371,27 +499,78 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
             "reason": "Only one class present for selected target mode.",
         }
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
+    stratify_target = y if positives >= 2 and negatives >= 2 else None
+    X_train_dict, X_test_dict, y_train, y_test = train_test_split(
+        X_dict,
+        y,
+        test_size=0.3,
+        random_state=42,
+        stratify=stratify_target,
     )
 
-    model = LogisticRegression(max_iter=1000)
+    vectorizer = DictVectorizer(sparse=True)
+    X_train = vectorizer.fit_transform(X_train_dict)
+    X_test = vectorizer.transform(X_test_dict)
+
+    model = LogisticRegression(max_iter=1000, class_weight="balanced")
     model.fit(X_train, y_train)
+
     proba = model.predict_proba(X_test)[:, 1]
     pred = (proba >= 0.5).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel()
+
+    auc = roc_auc_score(y_test, proba) if len(set(y_test)) == 2 else None
+
+    feature_names = vectorizer.get_feature_names_out()
+    coefs = model.coef_[0]
+    weighted_features = sorted(
+        zip(feature_names, coefs),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    top_positive = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[:8]]
+    top_negative = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[-8:]]
 
     return {
         "ran": True,
         "target_mode": mode,
-        "feature_set": ["score_only"],
-        "train_rows": len(X_train),
-        "test_rows": len(X_test),
-        "test_auc": round(float(roc_auc_score(y_test, proba)), 4),
-        "test_accuracy": round(float(accuracy_score(y_test, pred)), 4),
-        "test_precision": round(float(precision_score(y_test, pred, zero_division=0)), 4),
-        "test_recall": round(float(recall_score(y_test, pred, zero_division=0)), 4),
-        "coef_score": round(float(model.coef_[0][0]), 6),
-        "intercept": round(float(model.intercept_[0]), 6),
+        "feature_set": {
+            "core": ["score", "game_slug"],
+            "selected_normalized_numeric_features": selected_keys,
+            "selection_meta": feature_candidates,
+            "encoding": "DictVectorizer one-hot encodes categorical features and keeps numeric features as-is.",
+        },
+        "split_strategy": {
+            "method": "random_train_test_split",
+            "test_size": 0.3,
+            "random_state": 42,
+            "stratified": stratify_target is not None,
+            "limitation": "Single random split can be noisy on small datasets; use repeated CV once data grows.",
+        },
+        "class_balance": {
+            "total_rows": len(y),
+            "positives": positives,
+            "negatives": negatives,
+            "positive_rate_pct": round(pct(positives, len(y)), 2),
+        },
+        "metrics": {
+            "test_auc": round(float(auc), 4) if auc is not None else None,
+            "test_precision": round(float(precision_score(y_test, pred, zero_division=0)), 4),
+            "test_recall": round(float(recall_score(y_test, pred, zero_division=0)), 4),
+            "confusion_matrix": {
+                "tn": int(tn),
+                "fp": int(fp),
+                "fn": int(fn),
+                "tp": int(tp),
+            },
+        },
+        "model_details": {
+            "model_type": "LogisticRegression",
+            "class_weight": "balanced",
+            "intercept": round(float(model.intercept_[0]), 6),
+            "top_positive_coefficients": top_positive,
+            "top_negative_coefficients": top_negative,
+        },
     }
 
 
@@ -400,6 +579,7 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
     by_status_score = score_distribution_by_status(rows)
     rules_triage = compare_rules_score(rows, "triage_positive")
     rules_accepted = compare_rules_score(rows, "accepted_only")
+    per_game_triage = per_game_triage_evaluation(rows, args.min_game_sample)
 
     report: dict[str, Any] = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -410,6 +590,7 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
             "Timestamps may be naive UTC; normalize timezone in downstream analysis pipelines.",
             "Class imbalance is expected, especially for ACCEPTED-only targets.",
             "Per-game variation is likely significant; evaluate per-game before global model use.",
+            "Per-game AUC on tiny samples is directional only, not stable.",
         ],
         "label_distribution_by_game": by_game,
         "score_distribution_by_review_status": by_status_score,
@@ -417,10 +598,16 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
             "triage_positive_target": rules_triage,
             "accepted_only_target": rules_accepted,
         },
+        "per_game_triage_evaluation": per_game_triage,
+        "interpretation_guidance": {
+            "triage_auc_good_threshold": ">= 0.75 usually indicates useful triage ordering signal.",
+            "triage_auc_caution_threshold": "< 0.65 indicates weak ranking signal; inspect game-specific rules/features.",
+            "precision_recall_tradeoff_note": "Higher threshold tends to increase precision but reduce recall.",
+        },
     }
 
     if args.run_logistic:
-        report["logistic_baseline"] = run_optional_logistic(rows, args.target_mode)
+        report["logistic_experiment"] = run_optional_logistic(rows, args.target_mode, args)
 
     return report
 
@@ -437,9 +624,7 @@ def print_summary(report: dict[str, Any]) -> None:
     by_status = report["score_distribution_by_review_status"]
     for status in sorted(by_status.keys()):
         stats = by_status[status]
-        print(
-            f"- {status}: mean={stats['mean']} median={stats['median']} n={stats['n']}"
-        )
+        print(f"- {status}: mean={stats['mean']} median={stats['median']} n={stats['n']}")
 
     print("\nRules score vs outcome targets:")
     for name, section in report["rules_score_vs_outcomes"].items():
@@ -449,18 +634,38 @@ def print_summary(report: dict[str, Any]) -> None:
             f"rows_with_score={section['rows_with_score']}"
         )
 
-    if "logistic_baseline" in report:
-        logistic = report["logistic_baseline"]
+    print("\nPer-game triage-positive evaluation (sample, AUC):")
+    per_game = report["per_game_triage_evaluation"]["by_game"]
+    for game, section in per_game.items():
+        print(
+            f"- {game}: sample={section['sample_size']} "
+            f"auc={section['triage_positive_auc']} "
+            f"positive_rate_pct={section['positive_rate_pct']}"
+        )
+
+    strongest = report["per_game_triage_evaluation"]["strongest_games_by_auc"]
+    weakest = report["per_game_triage_evaluation"]["weakest_games_by_auc"]
+    if strongest:
+        print("\nStrongest games by triage AUC:")
+        for row in strongest:
+            print(f"- {row['game']}: auc={row['auc']} sample={row['sample_size']}")
+    if weakest:
+        print("\nWeakest games by triage AUC:")
+        for row in weakest:
+            print(f"- {row['game']}: auc={row['auc']} sample={row['sample_size']}")
+
+    if "logistic_experiment" in report:
+        logistic = report["logistic_experiment"]
         if logistic.get("ran"):
+            m = logistic["metrics"]
+            cm = m["confusion_matrix"]
             print(
-                "\nLogistic baseline (score-only): "
-                f"test_auc={logistic['test_auc']} "
-                f"accuracy={logistic['test_accuracy']} "
-                f"precision={logistic['test_precision']} "
-                f"recall={logistic['test_recall']}"
+                "\nLogistic experiment (offline): "
+                f"auc={m['test_auc']} precision={m['test_precision']} recall={m['test_recall']} "
+                f"cm=[tn={cm['tn']}, fp={cm['fp']}, fn={cm['fn']}, tp={cm['tp']}]"
             )
         else:
-            print(f"\nLogistic baseline skipped: {logistic.get('reason')}")
+            print(f"\nLogistic experiment skipped: {logistic.get('reason')}")
 
 
 def main() -> int:
