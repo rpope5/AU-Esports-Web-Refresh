@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from typing import Any
 
 from app.db.session import SessionLocal
 from app.core.deps import require_admin
@@ -14,7 +15,11 @@ from app.models.recruit import (
     RecruitReview,
     RECRUIT_REVIEW_STATUSES,
 )
-from app.schemas.admin import RecruitStatusUpdate, RecruitNotesUpdate
+from app.schemas.admin import (
+    RecruitStatusUpdate,
+    RecruitNotesUpdate,
+    RecruitTrainingExportResponse,
+)
 from datetime import datetime
 
 router = APIRouter()
@@ -25,6 +30,40 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def _build_score_components_summary(explanation_json: Any) -> list[dict[str, float | str | None]] | None:
+    if not isinstance(explanation_json, dict):
+        return None
+
+    components = explanation_json.get("components")
+    if not isinstance(components, dict):
+        return None
+
+    def to_float(value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
+    rows: list[dict[str, float | str | None]] = []
+    for component_name, component_values in components.items():
+        if not isinstance(component_values, dict):
+            continue
+        rows.append(
+            {
+                "component": str(component_name),
+                "raw": to_float(component_values.get("raw")),
+                "weight": to_float(component_values.get("weight")),
+                "contribution": to_float(component_values.get("contribution")),
+            }
+        )
+
+    def contribution_key(item: dict[str, float | str | None]) -> float:
+        value = item.get("contribution")
+        return float(value) if isinstance(value, (int, float)) else float("-inf")
+
+    rows.sort(key=contribution_key, reverse=True)
+    return rows[:5]
 
 
 @router.get("/admin/recruits/game/{game_slug}")
@@ -130,6 +169,111 @@ def list_recruits_for_game(
 
     results.sort(key=lambda x: (x["score"] is not None, x["score"]), reverse=True)
     return results
+
+
+@router.get("/admin/recruits/export/training", response_model=RecruitTrainingExportResponse)
+def export_recruit_training_data(
+    game_slug: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    submitted_from: datetime | None = Query(default=None),
+    submitted_to: datetime | None = Query(default=None),
+    limit: int = Query(default=2000, ge=1, le=10000),
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    normalized_status = status.upper() if status else None
+    if normalized_status and normalized_status not in RECRUIT_REVIEW_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
+    query = (
+        db.query(
+            RecruitApplication,
+            RecruitGameProfile,
+            Game,
+            RecruitRanking,
+            RecruitReview,
+            AdminUser.username,
+        )
+        .join(
+            RecruitGameProfile,
+            RecruitGameProfile.application_id == RecruitApplication.id,
+        )
+        .join(
+            Game,
+            Game.id == RecruitGameProfile.game_id,
+        )
+        .outerjoin(
+            RecruitRanking,
+            (RecruitRanking.application_id == RecruitApplication.id)
+            & (RecruitRanking.game_id == RecruitGameProfile.game_id)
+            & (RecruitRanking.is_current.is_(True)),
+        )
+        .outerjoin(
+            RecruitReview,
+            RecruitReview.application_id == RecruitApplication.id,
+        )
+        .outerjoin(
+            AdminUser,
+            AdminUser.id == RecruitReview.reviewer_user_id,
+        )
+    )
+
+    if game_slug:
+        query = query.filter(Game.slug == game_slug)
+
+    if normalized_status:
+        if normalized_status == "NEW":
+            query = query.filter(
+                or_(RecruitReview.status == normalized_status, RecruitReview.status.is_(None))
+            )
+        else:
+            query = query.filter(RecruitReview.status == normalized_status)
+
+    if submitted_from is not None:
+        query = query.filter(RecruitApplication.created_at >= submitted_from)
+
+    if submitted_to is not None:
+        query = query.filter(RecruitApplication.created_at <= submitted_to)
+
+    rows = (
+        query.order_by(RecruitApplication.created_at.desc(), RecruitApplication.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    export_rows = []
+    for app, _profile, game, ranking, review, reviewer_username in rows:
+        explanation_json = ranking.explanation_json if ranking else None
+        review_status = (
+            review.status
+            if review and review.status in RECRUIT_REVIEW_STATUSES
+            else "NEW"
+        )
+        export_rows.append(
+            {
+                "application_id": app.id,
+                "game_id": game.id,
+                "game_slug": game.slug,
+                "submitted_at": app.created_at,
+                "score": ranking.score if ranking else None,
+                "scoring_method": ranking.scoring_method if ranking else None,
+                "model_version": ranking.model_version if ranking else None,
+                "scored_at": ranking.scored_at if ranking else None,
+                "raw_inputs_json": ranking.raw_inputs_json if ranking else None,
+                "normalized_features_json": (
+                    ranking.normalized_features_json if ranking else None
+                ),
+                "explanation_json": explanation_json,
+                "score_components_summary": _build_score_components_summary(explanation_json),
+                "review_status": review_status,
+                "label_reason": review.label_reason if review else None,
+                "labeled_at": review.labeled_at if review else None,
+                "reviewer_user_id": review.reviewer_user_id if review else None,
+                "reviewer_username": reviewer_username,
+            }
+        )
+
+    return {"count": len(export_rows), "rows": export_rows}
 
 @router.get("/admin/recruit/{application_id}")
 def get_recruit_detail(
