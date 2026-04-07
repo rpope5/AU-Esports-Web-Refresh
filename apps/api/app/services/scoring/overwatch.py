@@ -132,18 +132,18 @@ def score_overwatch(payload: Any) -> ScoringResult:
     )
 
     total = (
-        0.55 * rank +
-        0.20 * availability +
+        0.70 * rank +
+        0.10 * availability +
         0.15 * experience +
-        0.10 * complete
+        0.05 * complete
     )
 
     explanation = make_explanation(
         {
-            "skill": make_component(rank, 0.55),
-            "availability": make_component(availability, 0.20),
+            "skill": make_component(rank, 0.70),
+            "availability": make_component(availability, 0.10),
             "experience": make_component(experience, 0.15),
-            "completeness": make_component(complete, 0.10),
+            "completeness": make_component(complete, 0.05),
         },
         total,
     )

@@ -2,18 +2,6 @@
 Offline analysis starter for recruit ranking export data.
 
 This script is intentionally offline-only and does not modify production scoring.
-
-Input options:
-1) Load JSON from local file created from /api/v1/admin/recruits/export/training
-2) Fetch directly from admin export endpoint with bearer auth
-
-Core outputs:
-- Label distribution by game
-- Score distribution by review status
-- Rules score vs coach outcome comparison for two binary target definitions
-- Per-game triage-positive evaluation (AUC, thresholds, sample size)
-- Optional logistic regression experiment using:
-  score + selected normalized numeric features + game_slug
 """
 
 from __future__ import annotations
@@ -64,16 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Offline recruit ranking/training analysis using admin export JSON."
     )
-    parser.add_argument(
-        "--input-file",
-        type=Path,
-        help="Path to saved export JSON (same shape as /admin/recruits/export/training).",
-    )
-    parser.add_argument(
-        "--api-base-url",
-        type=str,
-        help="API base URL (example: http://localhost:8000).",
-    )
+    parser.add_argument("--input-file", type=Path)
+    parser.add_argument("--api-base-url", type=str)
     parser.add_argument(
         "--token",
         type=str,
@@ -89,37 +69,13 @@ def parse_args() -> argparse.Namespace:
         "--target-mode",
         choices=["triage_positive", "accepted_only"],
         default="triage_positive",
-        help="Binary target definition used for optional logistic baseline.",
     )
-    parser.add_argument(
-        "--run-logistic",
-        action="store_true",
-        help="Run optional logistic regression experiment (offline only).",
-    )
-    parser.add_argument(
-        "--min-game-sample",
-        type=int,
-        default=5,
-        help="Minimum per-game rows (with scores) to treat game-level AUC as comparable.",
-    )
-    parser.add_argument(
-        "--norm-min-coverage",
-        type=float,
-        default=0.3,
-        help="Minimum coverage ratio for selecting normalized numeric features.",
-    )
-    parser.add_argument(
-        "--max-norm-features",
-        type=int,
-        default=10,
-        help="Max number of normalized numeric features to include in logistic experiment.",
-    )
-    parser.add_argument(
-        "--output-json",
-        type=Path,
-        default=None,
-        help="Optional path to write analysis summary JSON.",
-    )
+    parser.add_argument("--run-logistic", action="store_true")
+    parser.add_argument("--min-game-sample", type=int, default=5)
+    parser.add_argument("--norm-min-coverage", type=float, default=0.3)
+    parser.add_argument("--max-norm-features", type=int, default=10)
+    parser.add_argument("--weak-game-count", type=int, default=3)
+    parser.add_argument("--output-json", type=Path, default=None)
     return parser.parse_args()
 
 
@@ -129,9 +85,7 @@ def fetch_export_from_api(args: argparse.Namespace) -> dict[str, Any]:
     if not args.token:
         raise ValueError("Missing admin token. Pass --token or set AU_ADMIN_TOKEN.")
 
-    query = {
-        "limit": args.limit,
-    }
+    query = {"limit": args.limit}
     if args.game_slug:
         query["game_slug"] = args.game_slug
     if args.status:
@@ -145,10 +99,7 @@ def fetch_export_from_api(args: argparse.Namespace) -> dict[str, Any]:
     url = f"{base}/api/v1/admin/recruits/export/training?{urlencode(query)}"
     req = Request(
         url,
-        headers={
-            "Authorization": f"Bearer {args.token}",
-            "Accept": "application/json",
-        },
+        headers={"Authorization": f"Bearer {args.token}", "Accept": "application/json"},
         method="GET",
     )
     with urlopen(req, timeout=30) as response:
@@ -161,6 +112,12 @@ def load_export_data(args: argparse.Namespace) -> dict[str, Any]:
         with args.input_file.open("r", encoding="utf-8") as f:
             return json.load(f)
     return fetch_export_from_api(args)
+
+
+def to_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def parse_rows(payload: dict[str, Any]) -> list[ParsedRow]:
@@ -176,6 +133,7 @@ def parse_rows(payload: dict[str, Any]) -> list[ParsedRow]:
         game_slug = row.get("game_slug")
         if not isinstance(application_id, int) or not isinstance(game_slug, str):
             continue
+
         review_status = row.get("review_status")
         if not isinstance(review_status, str):
             review_status = "NEW"
@@ -183,12 +141,7 @@ def parse_rows(payload: dict[str, Any]) -> list[ParsedRow]:
         if review_status not in KNOWN_STATUSES:
             review_status = "NEW"
 
-        score = row.get("score")
-        if not isinstance(score, (int, float)):
-            score = None
-        else:
-            score = float(score)
-
+        score = to_float(row.get("score"))
         normalized = row.get("normalized_features_json")
         if not isinstance(normalized, dict):
             normalized = {}
@@ -231,15 +184,7 @@ def quantile(sorted_values: list[float], q: float) -> float | None:
 
 def summarize_score_distribution(values: list[float]) -> dict[str, float | int | None]:
     if not values:
-        return {
-            "n": 0,
-            "mean": None,
-            "median": None,
-            "min": None,
-            "max": None,
-            "p25": None,
-            "p75": None,
-        }
+        return {"n": 0, "mean": None, "median": None, "min": None, "max": None, "p25": None, "p75": None}
     sorted_values = sorted(values)
     return {
         "n": len(values),
@@ -250,6 +195,13 @@ def summarize_score_distribution(values: list[float]) -> dict[str, float | int |
         "p25": round(quantile(sorted_values, 0.25) or 0.0, 4),
         "p75": round(quantile(sorted_values, 0.75) or 0.0, 4),
     }
+
+
+def summarize_numeric(values: list[float]) -> dict[str, float | int | None]:
+    if not values:
+        return {"n": 0, "mean": None, "median": None, "std": None}
+    std = statistics.pstdev(values) if len(values) > 1 else 0.0
+    return {"n": len(values), "mean": round(statistics.fmean(values), 4), "median": round(statistics.median(values), 4), "std": round(std, 4)}
 
 
 def target_value(status: str, mode: str) -> int:
@@ -265,7 +217,6 @@ def auc_from_scores(y_true: list[int], y_score: list[float]) -> float | None:
     neg = len(y_true) - pos
     if pos == 0 or neg == 0:
         return None
-
     pairs = sorted(zip(y_score, y_true), key=lambda x: x[0])
     rank_sum_pos = 0.0
     i = 0
@@ -294,7 +245,6 @@ def threshold_metrics(y_true: list[int], y_score: list[float], threshold: float)
             tn += 1
         else:
             fn += 1
-
     precision = tp / (tp + fp) if (tp + fp) else 0.0
     recall = tp / (tp + fn) if (tp + fn) else 0.0
     specificity = tn / (tn + fp) if (tn + fp) else 0.0
@@ -316,7 +266,6 @@ def compare_rules_score(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
     labeled_rows = [r for r in rows if isinstance(r.score, float)]
     y_true = [target_value(r.review_status, mode) for r in labeled_rows]
     y_score = [r.score for r in labeled_rows if r.score is not None]
-
     positives = sum(y_true)
     negatives = len(y_true) - positives
     pos_scores = [s for y, s in zip(y_true, y_score) if y == 1]
@@ -346,9 +295,7 @@ def label_distribution_by_game(rows: list[ParsedRow]) -> dict[str, Any]:
         result[game] = {
             "total": total,
             "status_counts": dict(counter),
-            "status_pct": {
-                status: round(pct(count, total), 2) for status, count in counter.items()
-            },
+            "status_pct": {status: round(pct(count, total), 2) for status, count in counter.items()},
         }
     return result
 
@@ -365,7 +312,7 @@ def score_distribution_by_status(rows: list[ParsedRow]) -> dict[str, Any]:
     return result
 
 
-def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int) -> dict[str, Any]:
+def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int, weak_game_count: int) -> dict[str, Any]:
     by_game_rows: dict[str, list[ParsedRow]] = defaultdict(list)
     for row in rows:
         if row.score is not None:
@@ -383,9 +330,7 @@ def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int) -> d
         score_distribution = summarize_score_distribution(y_score)
         threshold_table = [threshold_metrics(y_true, y_score, t) for t in DEFAULT_THRESHOLDS]
 
-        auc_is_comparable = (
-            len(game_rows) >= min_game_sample and positives > 0 and negatives > 0 and score_auc is not None
-        )
+        auc_is_comparable = len(game_rows) >= min_game_sample and positives > 0 and negatives > 0 and score_auc is not None
         if auc_is_comparable:
             auc_candidates.append((game, score_auc, len(game_rows)))
 
@@ -401,13 +346,10 @@ def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int) -> d
         }
 
     auc_candidates.sort(key=lambda item: item[1], reverse=True)
-    strongest = [
-        {"game": game, "auc": auc, "sample_size": n}
-        for game, auc, n in auc_candidates[:3]
-    ]
+    strongest = [{"game": game, "auc": auc, "sample_size": n} for game, auc, n in auc_candidates[:3]]
     weakest = [
         {"game": game, "auc": auc, "sample_size": n}
-        for game, auc, n in auc_candidates[-3:]
+        for game, auc, n in sorted(auc_candidates, key=lambda item: item[1])[:weak_game_count]
     ]
 
     return {
@@ -418,18 +360,195 @@ def per_game_triage_evaluation(rows: list[ParsedRow], min_game_sample: int) -> d
     }
 
 
-def select_numeric_normalized_feature_keys(
-    rows: list[ParsedRow], min_coverage_ratio: float, max_features: int
-) -> list[dict[str, Any]]:
+def extract_component_contributions(row: ParsedRow) -> dict[str, float]:
+    explanation = row.raw.get("explanation_json")
+    if not isinstance(explanation, dict):
+        return {}
+    components = explanation.get("components")
+    if not isinstance(components, dict):
+        return {}
+
+    out: dict[str, float] = {}
+    for name, payload in components.items():
+        if not isinstance(payload, dict):
+            continue
+        contribution = to_float(payload.get("contribution"))
+        if contribution is None:
+            continue
+        out[str(name)] = contribution
+    return out
+
+
+def row_numeric_normalized_features(row: ParsedRow) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for key, value in row.normalized_features.items():
+        numeric = to_float(value)
+        if numeric is not None:
+            out[str(key)] = numeric
+    return out
+
+
+def compute_group_separation(pos_rows: list[ParsedRow], neg_rows: list[ParsedRow], extractor: callable, label: str) -> list[dict[str, Any]]:
+    pos_values: dict[str, list[float]] = defaultdict(list)
+    neg_values: dict[str, list[float]] = defaultdict(list)
+
+    for row in pos_rows:
+        for key, value in extractor(row).items():
+            pos_values[key].append(value)
+    for row in neg_rows:
+        for key, value in extractor(row).items():
+            neg_values[key].append(value)
+
+    all_keys = set(pos_values.keys()) | set(neg_values.keys())
+    output: list[dict[str, Any]] = []
+    for key in all_keys:
+        pos = pos_values.get(key, [])
+        neg = neg_values.get(key, [])
+        pos_summary = summarize_numeric(pos)
+        neg_summary = summarize_numeric(neg)
+        pos_mean = pos_summary["mean"]
+        neg_mean = neg_summary["mean"]
+
+        if pos_mean is None or neg_mean is None:
+            delta = None
+        else:
+            delta = round(float(pos_mean) - float(neg_mean), 4)
+
+        pos_std = float(pos_summary["std"]) if pos_summary["std"] is not None else 0.0
+        neg_std = float(neg_summary["std"]) if neg_summary["std"] is not None else 0.0
+        pooled_std = math.sqrt((pos_std**2 + neg_std**2) / 2.0) if (pos_std or neg_std) else 0.0
+        effect_size = round(delta / pooled_std, 4) if delta is not None and pooled_std > 0 else None
+
+        signal = "insufficient"
+        if delta is not None:
+            abs_delta = abs(delta)
+            abs_effect = abs(effect_size) if effect_size is not None else 0.0
+            if abs_delta >= 5.0 and abs_effect >= 0.5:
+                signal = "strong"
+            elif abs_delta < 2.0 or abs_effect < 0.2:
+                signal = "weak"
+            else:
+                signal = "moderate"
+
+        inconsistent = False
+        if delta is not None and effect_size is not None:
+            inconsistent = abs(delta) >= 2.0 and abs(effect_size) < 0.3 and (pos_std + neg_std) > 8.0
+
+        output.append(
+            {
+                label: key,
+                "positive_summary": pos_summary,
+                "negative_summary": neg_summary,
+                "delta_positive_minus_negative": delta,
+                "effect_size": effect_size,
+                "signal": signal,
+                "inconsistent": inconsistent,
+            }
+        )
+
+    output.sort(
+        key=lambda row: abs(row["delta_positive_minus_negative"]) if row["delta_positive_minus_negative"] is not None else -1.0,
+        reverse=True,
+    )
+    return output
+
+
+def top_mean_items(rows: list[ParsedRow], extractor: callable, label: str, top_n: int = 6) -> list[dict[str, Any]]:
+    values: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        for key, val in extractor(row).items():
+            values[key].append(val)
+
+    ranked: list[dict[str, Any]] = []
+    for key, vals in values.items():
+        summary = summarize_numeric(vals)
+        if summary["mean"] is None:
+            continue
+        ranked.append({label: key, "mean": summary["mean"], "median": summary["median"], "std": summary["std"], "n": summary["n"]})
+    ranked.sort(key=lambda row: row["mean"], reverse=True)
+    return ranked[:top_n]
+
+
+def status_component_means(rows: list[ParsedRow]) -> dict[str, dict[str, float]]:
+    by_status_component: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for row in rows:
+        for comp, contrib in extract_component_contributions(row).items():
+            by_status_component[row.review_status][comp].append(contrib)
+
+    result: dict[str, dict[str, float]] = {}
+    for status, comp_map in by_status_component.items():
+        means: dict[str, float] = {}
+        for comp, vals in comp_map.items():
+            if vals:
+                means[comp] = round(statistics.fmean(vals), 4)
+        result[status] = dict(sorted(means.items(), key=lambda kv: kv[0]))
+    return result
+
+
+def diagnose_game(rows: list[ParsedRow], game_slug: str) -> dict[str, Any]:
+    game_rows = [r for r in rows if r.game_slug == game_slug and r.score is not None]
+    positive_rows = [r for r in game_rows if target_value(r.review_status, "triage_positive") == 1]
+    negative_rows = [r for r in game_rows if target_value(r.review_status, "triage_positive") == 0]
+    rejected_rows = [r for r in game_rows if r.review_status == "REJECTED"]
+
+    component_sep = compute_group_separation(positive_rows, negative_rows, extract_component_contributions, "component")
+    feature_sep = compute_group_separation(positive_rows, negative_rows, row_numeric_normalized_features, "feature")
+
+    useful_components = [row for row in component_sep if row["signal"] == "strong"][:5]
+    weak_components = [row for row in component_sep if row["signal"] == "weak"][:5]
+    inconsistent_components = [row for row in component_sep if row["inconsistent"]][:5]
+    components_favoring_negative = [
+        row for row in component_sep if row["delta_positive_minus_negative"] is not None and row["delta_positive_minus_negative"] < 0
+    ][:5]
+
+    useful_features = [row for row in feature_sep if row["signal"] == "strong"][:5]
+    weak_features = [row for row in feature_sep if row["signal"] == "weak"][:5]
+
+    return {
+        "game": game_slug,
+        "sample_size": len(game_rows),
+        "positive_sample_size": len(positive_rows),
+        "negative_sample_size": len(negative_rows),
+        "rejected_sample_size": len(rejected_rows),
+        "average_component_contribution_by_status": status_component_means(game_rows),
+        "top_components_for_triage_positive": top_mean_items(positive_rows, extract_component_contributions, "component"),
+        "top_components_for_rejected": top_mean_items(rejected_rows, extract_component_contributions, "component"),
+        "component_distribution_positive_vs_negative": component_sep,
+        "normalized_feature_distribution_positive_vs_negative": feature_sep,
+        "most_useful_components": useful_components,
+        "least_useful_components": weak_components,
+        "inconsistent_components": inconsistent_components,
+        "components_favoring_negative": components_favoring_negative,
+        "most_useful_normalized_features": useful_features,
+        "least_useful_normalized_features": weak_features,
+    }
+
+
+def weak_game_diagnostics(rows: list[ParsedRow], per_game_eval: dict[str, Any]) -> dict[str, Any]:
+    weakest = per_game_eval.get("weakest_games_by_auc", [])
+    weak_game_slugs = [row["game"] for row in weakest if isinstance(row, dict) and "game" in row]
+    diagnostics = {game: diagnose_game(rows, game) for game in weak_game_slugs}
+    return {
+        "positive_definition": sorted(POSITIVE_TRIAGE_STATUSES),
+        "negative_definition": "all non-triage-positive statuses",
+        "rejected_focus": "REJECTED-only subgroup used for top rejected-component summaries",
+        "games": weak_game_slugs,
+        "by_game": diagnostics,
+    }
+
+
+def select_numeric_normalized_feature_keys(rows: list[ParsedRow], min_coverage_ratio: float, max_features: int) -> list[dict[str, Any]]:
     total_rows = len(rows)
     numeric_counts: Counter[str] = Counter()
     numeric_values: dict[str, list[float]] = defaultdict(list)
 
     for row in rows:
         for key, value in row.normalized_features.items():
-            if isinstance(value, (int, float)):
-                numeric_counts[key] += 1
-                numeric_values[key].append(float(value))
+            numeric = to_float(value)
+            if numeric is None:
+                continue
+            numeric_counts[key] += 1
+            numeric_values[key].append(numeric)
 
     candidates: list[dict[str, Any]] = []
     for key, count in numeric_counts.items():
@@ -438,14 +557,7 @@ def select_numeric_normalized_feature_keys(
             continue
         vals = numeric_values[key]
         variance = statistics.pvariance(vals) if len(vals) > 1 else 0.0
-        candidates.append(
-            {
-                "key": key,
-                "count": count,
-                "coverage_ratio": round(coverage, 4),
-                "variance": round(float(variance), 6),
-            }
-        )
+        candidates.append({"key": key, "count": count, "coverage_ratio": round(coverage, 4), "variance": round(float(variance), 6)})
 
     candidates.sort(key=lambda row: (row["count"], row["variance"], row["key"]), reverse=True)
     return candidates[:max_features]
@@ -458,54 +570,36 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
         from sklearn.metrics import confusion_matrix, precision_score, recall_score, roc_auc_score
         from sklearn.model_selection import train_test_split
     except ImportError:
-        return {
-            "ran": False,
-            "reason": "scikit-learn not installed. Install it in the analysis environment to enable this step.",
-        }
+        return {"ran": False, "reason": "scikit-learn not installed. Install it in the analysis environment to enable this step."}
 
     labeled_rows = [r for r in rows if r.score is not None]
     if len(labeled_rows) < 30:
-        return {
-            "ran": False,
-            "reason": "Not enough rows with score for a stable train/test split (need ~30+).",
-        }
+        return {"ran": False, "reason": "Not enough rows with score for a stable train/test split (need ~30+)."}
 
     feature_candidates = select_numeric_normalized_feature_keys(
-        labeled_rows,
-        min_coverage_ratio=args.norm_min_coverage,
-        max_features=args.max_norm_features,
+        labeled_rows, min_coverage_ratio=args.norm_min_coverage, max_features=args.max_norm_features
     )
     selected_keys = [row["key"] for row in feature_candidates]
 
     X_dict: list[dict[str, Any]] = []
     y: list[int] = []
     for row in labeled_rows:
-        feature_row: dict[str, Any] = {
-            "score": float(row.score),
-            "game_slug": row.game_slug,
-        }
+        feature_row: dict[str, Any] = {"score": float(row.score), "game_slug": row.game_slug}
         for key in selected_keys:
-            value = row.normalized_features.get(key)
-            if isinstance(value, (int, float)):
-                feature_row[f"norm__{key}"] = float(value)
+            value = to_float(row.normalized_features.get(key))
+            if value is not None:
+                feature_row[f"norm__{key}"] = value
         X_dict.append(feature_row)
         y.append(target_value(row.review_status, mode))
 
     positives = sum(y)
     negatives = len(y) - positives
     if positives == 0 or negatives == 0:
-        return {
-            "ran": False,
-            "reason": "Only one class present for selected target mode.",
-        }
+        return {"ran": False, "reason": "Only one class present for selected target mode."}
 
     stratify_target = y if positives >= 2 and negatives >= 2 else None
     X_train_dict, X_test_dict, y_train, y_test = train_test_split(
-        X_dict,
-        y,
-        test_size=0.3,
-        random_state=42,
-        stratify=stratify_target,
+        X_dict, y, test_size=0.3, random_state=42, stratify=stratify_target
     )
 
     vectorizer = DictVectorizer(sparse=True)
@@ -514,20 +608,14 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
 
     model = LogisticRegression(max_iter=1000, class_weight="balanced")
     model.fit(X_train, y_train)
-
     proba = model.predict_proba(X_test)[:, 1]
     pred = (proba >= 0.5).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel()
-
     auc = roc_auc_score(y_test, proba) if len(set(y_test)) == 2 else None
 
     feature_names = vectorizer.get_feature_names_out()
     coefs = model.coef_[0]
-    weighted_features = sorted(
-        zip(feature_names, coefs),
-        key=lambda item: item[1],
-        reverse=True,
-    )
+    weighted_features = sorted(zip(feature_names, coefs), key=lambda item: item[1], reverse=True)
     top_positive = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[:8]]
     top_negative = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[-8:]]
 
@@ -557,12 +645,7 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
             "test_auc": round(float(auc), 4) if auc is not None else None,
             "test_precision": round(float(precision_score(y_test, pred, zero_division=0)), 4),
             "test_recall": round(float(recall_score(y_test, pred, zero_division=0)), 4),
-            "confusion_matrix": {
-                "tn": int(tn),
-                "fp": int(fp),
-                "fn": int(fn),
-                "tp": int(tp),
-            },
+            "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
         },
         "model_details": {
             "model_type": "LogisticRegression",
@@ -579,7 +662,8 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
     by_status_score = score_distribution_by_status(rows)
     rules_triage = compare_rules_score(rows, "triage_positive")
     rules_accepted = compare_rules_score(rows, "accepted_only")
-    per_game_triage = per_game_triage_evaluation(rows, args.min_game_sample)
+    per_game_triage = per_game_triage_evaluation(rows, args.min_game_sample, args.weak_game_count)
+    weak_diagnostics = weak_game_diagnostics(rows, per_game_triage)
 
     report: dict[str, Any] = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -590,7 +674,8 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
             "Timestamps may be naive UTC; normalize timezone in downstream analysis pipelines.",
             "Class imbalance is expected, especially for ACCEPTED-only targets.",
             "Per-game variation is likely significant; evaluate per-game before global model use.",
-            "Per-game AUC on tiny samples is directional only, not stable.",
+            "Per-game AUC on modest samples is directional, not final.",
+            "Weak-game diagnostics compare triage-positive vs non-triage-positive outcomes.",
         ],
         "label_distribution_by_game": by_game,
         "score_distribution_by_review_status": by_status_score,
@@ -599,10 +684,11 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
             "accepted_only_target": rules_accepted,
         },
         "per_game_triage_evaluation": per_game_triage,
+        "weak_game_diagnostics": weak_diagnostics,
         "interpretation_guidance": {
             "triage_auc_good_threshold": ">= 0.75 usually indicates useful triage ordering signal.",
             "triage_auc_caution_threshold": "< 0.65 indicates weak ranking signal; inspect game-specific rules/features.",
-            "precision_recall_tradeoff_note": "Higher threshold tends to increase precision but reduce recall.",
+            "component_signal_guide": "Strong signal = high mean gap plus reasonable effect size; weak signal = low gap/effect.",
         },
     }
 
@@ -653,6 +739,31 @@ def print_summary(report: dict[str, Any]) -> None:
         print("\nWeakest games by triage AUC:")
         for row in weakest:
             print(f"- {row['game']}: auc={row['auc']} sample={row['sample_size']}")
+
+    diagnostics = report.get("weak_game_diagnostics", {})
+    weak_games = diagnostics.get("games", [])
+    by_game_diag = diagnostics.get("by_game", {})
+    if weak_games:
+        print("\nWeak-game component/feature diagnostics:")
+        for game in weak_games:
+            diag = by_game_diag.get(game, {})
+            useful = diag.get("most_useful_components", [])
+            weak = diag.get("least_useful_components", [])
+            inconsistent = diag.get("inconsistent_components", [])
+            useful_features = diag.get("most_useful_normalized_features", [])
+
+            useful_names = [row.get("component") for row in useful[:3]]
+            weak_names = [row.get("component") for row in weak[:3]]
+            incons_names = [row.get("component") for row in inconsistent[:3]]
+            feature_names = [row.get("feature") for row in useful_features[:3]]
+
+            print(
+                f"- {game}: "
+                f"useful_components={useful_names if useful_names else []} "
+                f"weak_components={weak_names if weak_names else []} "
+                f"inconsistent_components={incons_names if incons_names else []} "
+                f"useful_normalized_features={feature_names if feature_names else []}"
+            )
 
     if "logistic_experiment" in report:
         logistic = report["logistic_experiment"]

@@ -63,8 +63,8 @@ def _experience_score(team: bool, scrim: bool, tourney: str) -> float:
 
 def _completeness_score(tracker: bool, ign: bool, roles: bool, peak: bool) -> float:
     score = 0.0
-    score += 30.0 if ign else 0.0
-    score += 30.0 if roles else 0.0
+    score += 25.0 if ign else 0.0
+    score += 20.0 if roles else 0.0
     score += 20.0 if tracker else 0.0
     score += 20.0 if peak else 0.0
     return float(max(0.0, min(100.0, score)))
@@ -131,20 +131,30 @@ def score_fortnite(payload: Any) -> ScoringResult:
         inputs.roles_present,
         inputs.peak_rank_present,
     )
+    
+    mode_bonus = 0.0
+
+    preferred_mode = "builds"  # or pull this from config/db later
+
+    player_mode = (raw_inputs.get("fortnite_mode") or "").lower()
+
+    if preferred_mode in player_mode:
+        mode_bonus = 8.0  # 5–10 range is good
 
     total = (
-        0.55 * rank +
-        0.20 * availability +
-        0.15 * experience +
-        0.10 * complete
+        0.45 * rank +
+        0.10 * availability +
+        0.40 * experience +
+        0.05 * complete
     )
+    total = min(100.0, total + mode_bonus)
 
     explanation = make_explanation(
         {
-            "skill": make_component(rank, 0.55),
-            "availability": make_component(availability, 0.20),
-            "experience": make_component(experience, 0.15),
-            "completeness": make_component(complete, 0.10),
+            "skill": make_component(rank, 0.45),
+            "availability": make_component(availability, 0.10),
+            "experience": make_component(experience, 0.40),
+            "completeness": make_component(complete, 0.05),
         },
         total,
     )

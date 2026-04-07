@@ -132,18 +132,18 @@ def score_rocket_league(payload: Any) -> ScoringResult:
     )
 
     total = (
-        0.55 * rank +
-        0.20 * availability +
-        0.15 * experience +
-        0.10 * complete
+        0.78 * rank +
+        0.10 * availability +
+        0.07 * experience +
+        0.05 * complete
     )
 
     explanation = make_explanation(
         {
-            "skill": make_component(rank, 0.55),
-            "availability": make_component(availability, 0.20),
-            "experience": make_component(experience, 0.15),
-            "completeness": make_component(complete, 0.10),
+            "skill": make_component(rank, 0.78),
+            "availability": make_component(availability, 0.10),
+            "experience": make_component(experience, 0.07),
+            "completeness": make_component(complete, 0.05),
         },
         total,
     )

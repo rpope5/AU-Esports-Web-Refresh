@@ -145,18 +145,18 @@ def score_valorant(payload: Any) -> ScoringResult:
     complete = _completeness_score(inputs.tracker_url_present, inputs.ign_present, inputs.roles_present, inputs.peak_rank_present)
 
     total = (
-        0.55 * rank +
-        0.20 * availability +
-        0.15 * experience +
-        0.10 * complete
+        0.62 * rank +
+        0.10 * availability +
+        0.23 * experience +
+        0.05 * complete
     )
 
     explanation = make_explanation(
         {
-            "skill": make_component(rank, 0.55),
-            "availability": make_component(availability, 0.20),
-            "experience": make_component(experience, 0.15),
-            "completeness": make_component(complete, 0.10),
+            "skill": make_component(rank, 0.62),
+            "availability": make_component(availability, 0.10),
+            "experience": make_component(experience, 0.23),
+            "completeness": make_component(complete, 0.05),
         },
         total,
     )

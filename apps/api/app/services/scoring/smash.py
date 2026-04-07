@@ -62,11 +62,11 @@ def _wins_score(best_wins: str | None) -> float:
     if count >= 5:
         return 100.0
     if count >= 3:
-        return 80.0
+        return 85.0
     if count >= 1:
-        return 60.0
+        return 65.0
 
-    return 0.0
+        return 0.0
 
 
 def _availability_score(hours, wn, we):
@@ -140,9 +140,9 @@ def score_smash(payload: Any) -> ScoringResult:
     )
 
     total = (
-        0.35 * gsp +
-        0.20 * regional +
-        0.15 * wins +
+        0.25 * gsp +
+        0.25 * regional +
+        0.20 * wins +
         0.15 * tourney +
         0.10 * availability +
         0.05 * complete
@@ -150,9 +150,9 @@ def score_smash(payload: Any) -> ScoringResult:
 
     explanation = make_explanation(
         {
-            "skill_gsp": make_component(gsp, 0.35),
-            "skill_regional": make_component(regional, 0.20),
-            "skill_wins": make_component(wins, 0.15),
+            "skill_gsp": make_component(gsp, 0.25),
+            "skill_regional": make_component(regional, 0.25),
+            "skill_wins": make_component(wins, 0.20),
             "experience": make_component(tourney, 0.15),
             "availability": make_component(availability, 0.10),
             "completeness": make_component(complete, 0.05),
