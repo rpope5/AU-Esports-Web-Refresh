@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "./scoreBands";
 
 type ScoreComponent = {
   raw?: number;
@@ -104,6 +105,8 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
   const [sortBy, setSortBy] = useState<SortOption>("score_desc");
   const [statusFilter, setStatusFilter] = useState<"" | RecruitReviewStatus>("");
   const [minScoreInput, setMinScoreInput] = useState("");
+  const triageLegend = useMemo(() => getScoreBandLegend(gameSlug), [gameSlug]);
+  const isSmashPolicy = usesSmashScoreBands(gameSlug);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -234,6 +237,28 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         </div>
       </div>
 
+      <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950 p-3">
+        <p className="text-sm text-neutral-200">Coach triage playbook</p>
+        <p className="mt-1 text-xs text-neutral-400">
+          Scores help prioritize review order. Coaches make final decisions using gameplay context and notes.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {triageLegend.map((item) => (
+            <span
+              key={`${item.label}-${item.range}`}
+              className="rounded-full border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-300"
+            >
+              {item.label}: {item.range}
+            </span>
+          ))}
+          {isSmashPolicy && (
+            <span className="rounded-full border border-amber-800 bg-amber-950/40 px-2 py-1 text-amber-200">
+              Smash uses lower score bands by design.
+            </span>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <p className="mt-4 text-neutral-400">Loading...</p>
       ) : err ? (
@@ -242,42 +267,52 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         <p className="mt-4 text-neutral-400">No recruits found for current filters.</p>
       ) : (
         <div className="mt-6 grid gap-4">
-          {displayedRecruits.map((r) => (
-            <Link
-              key={r.application_id}
-              href={`/admin/recruits/${r.application_id}`}
-              className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:border-neutral-700"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-medium">
-                    {r.first_name} {r.last_name}
-                  </h2>
-                  <p className="text-sm text-neutral-400">
-                    {(r.ign || "N/A")} | {(r.current_rank_label || "N/A")} | {(r.primary_role || "N/A")}
-                    {r.secondary_role ? ` / ${r.secondary_role}` : ""}
-                  </p>
-                  <p className="mt-1 text-sm text-neutral-500">
-                    {r.current_school || "Unknown school"} | Class of {r.graduation_year ?? "N/A"}
-                  </p>
-                  <p className="mt-2 text-xs text-neutral-500">{reasonPreview(r.score_components)}</p>
-                </div>
+          {displayedRecruits.map((r) => {
+            const scoreBand = getScoreBand(r.score, gameSlug);
+            return (
+              <Link
+                key={r.application_id}
+                href={`/admin/recruits/${r.application_id}`}
+                className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:border-neutral-700"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-medium">
+                      {r.first_name} {r.last_name}
+                    </h2>
+                    <p className="text-sm text-neutral-400">
+                      {(r.ign || "N/A")} | {(r.current_rank_label || "N/A")} | {(r.primary_role || "N/A")}
+                      {r.secondary_role ? ` / ${r.secondary_role}` : ""}
+                    </p>
+                    <p className="mt-1 text-sm text-neutral-500">
+                      {r.current_school || "Unknown school"} | Class of {r.graduation_year ?? "N/A"}
+                    </p>
+                    <p className="mt-2 text-xs text-neutral-500">{reasonPreview(r.score_components)}</p>
+                  </div>
 
-                <div className="text-right">
-                  <div className="text-sm text-neutral-400">Score</div>
-                  <div className="text-2xl font-semibold">{r.score ?? "--"}</div>
-                  <div className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{r.status}</div>
-                  <div className="mt-1 text-xs text-neutral-500">Labeled: {formatTimestampShort(r.review_labeled_at)}</div>
-                  <div className="mt-1 text-xs text-neutral-500">By: {r.reviewer_username || "N/A"}</div>
-                  {r.score_model_version && (
-                    <div className="mt-1 text-xs text-neutral-600">
-                      {r.score_scoring_method || "rules"} | {r.score_model_version}
-                    </div>
-                  )}
+                  <div className="text-right">
+                    <div className="text-sm text-neutral-400">Score</div>
+                    <div className="text-2xl font-semibold">{r.score ?? "--"}</div>
+                    {scoreBand && (
+                      <div
+                        className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${scoreBand.badgeClassName}`}
+                      >
+                        {scoreBand.label}
+                      </div>
+                    )}
+                    <div className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{r.status}</div>
+                    <div className="mt-1 text-xs text-neutral-500">Labeled: {formatTimestampShort(r.review_labeled_at)}</div>
+                    <div className="mt-1 text-xs text-neutral-500">By: {r.reviewer_username || "N/A"}</div>
+                    {r.score_model_version && (
+                      <div className="mt-1 text-xs text-neutral-600">
+                        {r.score_scoring_method || "rules"} | {r.score_model_version}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

@@ -23,3 +23,7 @@ docs/ # diagrams and documentation
 
 ---
 
+## Recruiting Docs
+
+- [Recruit Triage Playbook (Phase 1)](./recruit-triage-playbook.md)
+

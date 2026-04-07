@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "../_components/scoreBands";
 
 type ScoreComponent = {
   raw?: number;
@@ -40,6 +41,7 @@ type AvailabilityData = {
 };
 
 type ProfileData = {
+  game_slug?: string | null;
   ign?: string | null;
   current_rank_label?: string | null;
   peak_rank_label?: string | null;
@@ -289,6 +291,10 @@ export default function RecruitDetailPage() {
   const app = data.application;
   const availability = data.availability;
   const profile = data.profiles?.[0];
+  const recruitGameSlug = profile?.game_slug || (isSmashProfile ? "smash" : null);
+  const scoreBand = getScoreBand(ranking?.score, recruitGameSlug);
+  const scoreBandLegend = getScoreBandLegend(recruitGameSlug);
+  const usesSmashBands = usesSmashScoreBands(recruitGameSlug);
   const review = data.review;
   const reviewerDisplay = review?.reviewer_username || (review?.reviewer_user_id ? `User #${review.reviewer_user_id}` : "N/A");
 
@@ -387,6 +393,36 @@ export default function RecruitDetailPage() {
           <div>
             <p className="text-sm text-neutral-400">Overall Score</p>
             <p className="mt-1 text-3xl font-semibold">{ranking?.score ?? "N/A"}</p>
+            {scoreBand && (
+              <div className="mt-2">
+                <span
+                  className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${scoreBand.badgeClassName}`}
+                >
+                  {scoreBand.label}
+                </span>
+                <p className="mt-2 text-sm text-neutral-300">{scoreBand.coachGuidance}</p>
+              </div>
+            )}
+            <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Coach triage playbook</p>
+              <p className="mt-1 text-xs text-neutral-400">
+                Use score bands to prioritize review order. Coaches make final decisions using gameplay fit, notes,
+                and current team needs.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-300">
+                {scoreBandLegend.map((item) => (
+                  <span
+                    key={`${item.label}-${item.range}`}
+                    className="rounded-full border border-neutral-700 bg-neutral-900 px-2 py-1"
+                  >
+                    {item.label}: {item.range}
+                  </span>
+                ))}
+              </div>
+              {usesSmashBands && (
+                <p className="mt-2 text-xs text-amber-300">Smash intentionally uses lower score bands.</p>
+              )}
+            </div>
             <p className="mt-2 text-sm text-neutral-400">
               Scoring Method: <span className="text-white">{ranking?.scoring_method || "N/A"}</span>
             </p>
