@@ -16,6 +16,7 @@ from app.services.scoring.base import score_application
 
 
 router = APIRouter()
+TOURNAMENT_EXPERIENCE_WITH_DETAILS = {"local", "regional", "national"}
 
 
 def get_db():
@@ -59,6 +60,13 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
             )
             db.add(avail)
 
+            tournament_experience_details = None
+            if (
+                data.game_slug == "mario-kart"
+                and data.profile.tournament_experience in TOURNAMENT_EXPERIENCE_WITH_DETAILS
+            ):
+                tournament_experience_details = data.profile.tournament_experience_details
+
             profile = RecruitGameProfile(
                 application_id=app_obj.id,
                 game_id=game.id,
@@ -73,6 +81,7 @@ def apply_recruit(data: RecruitApplyInput, db: Session = Depends(get_db)):
                 team_experience=data.profile.team_experience,
                 scrim_experience=data.profile.scrim_experience,
                 tournament_experience=data.profile.tournament_experience,
+                tournament_experience_details=tournament_experience_details,
                 fortnite_mode=data.profile.fortnite_mode,
                 epic_games_name=data.profile.epic_games_name,
                 fortnite_pr=data.profile.fortnite_pr,

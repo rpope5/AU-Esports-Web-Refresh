@@ -4,6 +4,7 @@ from datetime import datetime
 
 
 CURRENT_YEAR = datetime.now().year
+TOURNAMENT_EXPERIENCE_WITH_DETAILS = {"local", "regional", "national"}
 
 
 class AvailabilityInput(BaseModel):
@@ -22,6 +23,7 @@ class RecruitProfileInput(BaseModel):
     team_experience: bool
     scrim_experience: bool
     tournament_experience: Literal["none", "local", "regional", "national"]
+    tournament_experience_details: Optional[str] = Field(default=None, max_length=2000)
     fortnite_mode: str | None = None
     epic_games_name: Optional[str] = Field(default=None, min_length=1, max_length=64)
     fortnite_pr: Optional[int] = Field(default=None, ge=0, le=1000000)
@@ -50,7 +52,16 @@ class RecruitProfileInput(BaseModel):
     controller_type: Optional[str] = Field(default=None, max_length=50)
     playstyle: Optional[str] = Field(default=None, max_length=50)
     preferred_tracks: Optional[str] = Field(default=None, max_length=255)
-    
+
+    @field_validator("tournament_experience_details", mode="before")
+    @classmethod
+    def normalize_tournament_experience_details(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
 
 class RecruitApplyInput(BaseModel):
@@ -95,5 +106,8 @@ class RecruitApplyInput(BaseModel):
                 raise ValueError("current_rank_label is required for this game")
             if not self.profile.primary_role:
                 raise ValueError("primary_role is required for this game")
+
+        if self.profile.tournament_experience not in TOURNAMENT_EXPERIENCE_WITH_DETAILS:
+            self.profile.tournament_experience_details = None
 
         return self

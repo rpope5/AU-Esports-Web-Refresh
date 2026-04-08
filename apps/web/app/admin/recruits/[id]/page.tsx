@@ -58,6 +58,7 @@ type ProfileData = {
   fortnite_playtime_hours?: number | null;
   fortnite_wins?: number | null;
   tournament_experience?: string | null;
+  tournament_experience_details?: string | null;
   tracker_url?: string | null;
   gsp?: number | null;
   regional_rank?: string | null;
@@ -334,6 +335,9 @@ export default function RecruitDetailPage() {
             <p>Secondary Role / Extra Info: {profile?.secondary_role || "N/A"}</p>
             {profile?.cs2_roles && <p>CS2 Additional Roles: {profile.cs2_roles}</p>}
             <p>Tournament Experience: {profile?.tournament_experience || "N/A"}</p>
+            {profile?.tournament_experience_details && (
+              <p>Tournament Experience Details: {profile.tournament_experience_details}</p>
+            )}
             {profile?.tracker_url ? (
               <p>
                 Tracker:{" "}

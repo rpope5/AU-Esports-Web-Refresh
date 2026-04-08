@@ -38,6 +38,7 @@ type FormState = {
   team_experience: boolean;
   scrim_experience: boolean;
   tournament_experience: string;
+  tournament_experience_details: string;
   ranked_wins: string;
   years_played: string;
   legend_peak_rank: string;
@@ -369,6 +370,7 @@ const marioKartControllers = [
   "GameCube Controller",
   "Other",
 ];
+const marioKartTournamentDetailLevels = new Set(["local", "regional", "national"]);
 
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -405,6 +407,7 @@ export default function RecruitPage() {
     team_experience: false,
     scrim_experience: false,
     tournament_experience: "none",
+    tournament_experience_details: "",
 
     ranked_wins: "",
     years_played: "",
@@ -449,6 +452,17 @@ export default function RecruitPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function updateTournamentExperience(value: string) {
+    setForm((prev) => ({
+      ...prev,
+      tournament_experience: value,
+      tournament_experience_details:
+        prev.game_slug === "mario-kart" && !marioKartTournamentDetailLevels.has(value)
+          ? ""
+          : prev.tournament_experience_details,
+    }));
+  }
+
   function resetGameFields(game: GameSlug) {
     setForm((prev) => ({
       ...prev,
@@ -473,6 +487,7 @@ export default function RecruitPage() {
       team_experience: false,
       scrim_experience: false,
       tournament_experience: "none",
+      tournament_experience_details: "",
 
       ranked_wins: "",
       years_played: "",
@@ -646,6 +661,11 @@ export default function RecruitPage() {
           team_experience: form.team_experience,
           scrim_experience: form.scrim_experience,
           tournament_experience: form.tournament_experience,
+          tournament_experience_details:
+            form.game_slug === "mario-kart" &&
+            marioKartTournamentDetailLevels.has(form.tournament_experience)
+              ? form.tournament_experience_details || null
+              : null,
 
           ranked_wins: form.ranked_wins ? Number(form.ranked_wins) : null,
           years_played: form.years_played ? Number(form.years_played) : null,
@@ -720,6 +740,7 @@ export default function RecruitPage() {
         team_experience: false,
         scrim_experience: false,
         tournament_experience: "none",
+        tournament_experience_details: "",
 
         ranked_wins: "",
         years_played: "",
@@ -1164,7 +1185,7 @@ const [isLive, setIsLive] = useState(false);
                   <select
                     className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
-                    onChange={(e) => update("tournament_experience", e.target.value)}
+                    onChange={(e) => updateTournamentExperience(e.target.value)}
                   >
                     <option value="none">None</option>
                     <option value="local">Local</option>
@@ -1172,6 +1193,26 @@ const [isLive, setIsLive] = useState(false);
                     <option value="national">National</option>
                   </select>
                 </div>
+
+                {form.game_slug === "mario-kart" &&
+                  marioKartTournamentDetailLevels.has(form.tournament_experience) && (
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium text-[#FFC72C]">
+                        Explain your tournament experience
+                      </label>
+                      <textarea
+                        className="mt-1 min-h-[120px] w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                        value={form.tournament_experience_details}
+                        onChange={(e) =>
+                          update("tournament_experience_details", e.target.value)
+                        }
+                        placeholder="Examples: events attended, placements, regions competed in, notable experience."
+                      />
+                      <p className="mt-1 text-xs text-neutral-500">
+                        Share events attended, placements, regions competed in, and notable experience.
+                      </p>
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-3 pt-6">
                   <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
@@ -1479,9 +1520,7 @@ const [isLive, setIsLive] = useState(false);
                   <select
                     className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
-                    onChange={(e) =>
-                      update("tournament_experience", e.target.value)
-                    }
+                    onChange={(e) => updateTournamentExperience(e.target.value)}
                   >
                     <option value="none">None</option>
                     <option value="local">Local</option>
