@@ -45,7 +45,6 @@ export default function Home() {
   const [matches, setMatches] = useState<any[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
 
-  // Load roster
 useEffect(() => {
   fetch("http://localhost:8000/api/v1/roster")
     .then((res) => res.json())

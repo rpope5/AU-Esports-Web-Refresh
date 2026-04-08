@@ -685,7 +685,7 @@ export default function RecruitPage() {
       const data = JSON.parse(text);
 
       setSuccess(
-        `Application submitted successfully. Current score: ${data.score}`
+        `Application submitted successfully.`
       );
 
       setForm((prev) => ({
@@ -756,7 +756,7 @@ const [isLive, setIsLive] = useState(false);
     return () => clearInterval(interval);
   }, []);
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white recruit-dropdown-theme">
       <div className="match-bar">
         <button
           className="match-arrow"
@@ -841,17 +841,17 @@ const [isLive, setIsLive] = useState(false);
       </header>
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
       <main className="mx-auto max-w-5xl px-6 pb-12 pt-8">
-        <div className="mb-6">
-          <h2 className="text-3xl font-semibold">Recruitment</h2>
-          <p className="mt-2 text-sm text-neutral-400">
+        <div className="mb-8 rounded-xl bg-gradient-to-r from-[#5C068C] to-[#7a1a9f] p-6 border border-[#FFC72C]/30">
+          <h2 className="text-4xl font-bold text-[#FFC72C]">Recruitment</h2>
+          <p className="mt-3 text-sm text-neutral-200">
             Submit your information to be considered for the AU Esports program.
             We have opportunities for scholarships through our athletics department!
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-8">
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
-            <h3 className="text-xl font-medium">Basic Information</h3>
+          <section className="rounded-2xl border-2 border-[#FFC72C] bg-neutral-950 p-6 shadow-lg shadow-[#5C068C]/20">
+            <h3 className="text-xl font-semibold text-[#FFC72C]">Basic Information</h3>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Input
@@ -885,9 +885,9 @@ const [isLive, setIsLive] = useState(false);
                 onChange={(v) => update("current_school", v)}
               />
               <div>
-                <label className="text-sm text-neutral-300">Graduation Year</label>
+                <label className="text-sm font-medium text-[#FFC72C]">Graduation Year</label>
                 <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                   value={form.graduation_year}
                   onChange={(e) => update("graduation_year", e.target.value)}
                 >
@@ -900,11 +900,11 @@ const [isLive, setIsLive] = useState(false);
                 </select>
               </div>
               <div>
-                <label className="text-sm text-neutral-300">
+                <label className="text-sm font-medium text-[#FFC72C]">
                   Preferred Contact
                 </label>
                 <select
-                  className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                   value={form.preferred_contact}
                   onChange={(e) => update("preferred_contact", e.target.value)}
                 >
@@ -915,8 +915,8 @@ const [isLive, setIsLive] = useState(false);
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
-            <h3 className="text-xl font-medium">Availability</h3>
+          <section className="rounded-2xl border-2 border-[#FFC72C] bg-neutral-950 p-6 shadow-lg shadow-[#5C068C]/20">
+            <h3 className="text-xl font-semibold text-[#FFC72C]">Availability</h3>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Input
@@ -930,7 +930,7 @@ const [isLive, setIsLive] = useState(false);
               />
 
               <div className="flex flex-col gap-3 pt-6">
-                <label className="flex items-center gap-2 text-sm text-neutral-300">
+                <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                   <input
                     type="checkbox"
                     checked={form.weeknights_available}
@@ -941,7 +941,7 @@ const [isLive, setIsLive] = useState(false);
                   Available on weeknights
                 </label>
 
-                <label className="flex items-center gap-2 text-sm text-neutral-300">
+                <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                   <input
                     type="checkbox"
                     checked={form.weekends_available}
@@ -955,13 +955,13 @@ const [isLive, setIsLive] = useState(false);
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
-            <h3 className="text-xl font-medium">Game Selection</h3>
+          <section className="rounded-2xl border-2 border-[#FFC72C] bg-neutral-950 p-6 shadow-lg shadow-[#5C068C]/20">
+            <h3 className="text-xl font-semibold text-[#FFC72C]">Game Selection</h3>
 
             <div className="mt-4">
-              <label className="text-sm text-neutral-300">Game</label>
+              <label className="text-sm font-medium text-[#FFC72C]">Game</label>
               <select
-                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                 value={form.game_slug}
                 onChange={(e) =>
                   resetGameFields(e.target.value as GameSlug)
@@ -1009,9 +1009,9 @@ const [isLive, setIsLive] = useState(false);
                 />
 
                 <div>
-                  <label className="text-sm text-neutral-300">Preferred Format</label>
+                  <label className="text-sm font-medium text-[#FFC72C]">Preferred Format</label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value="Standard"
                     disabled
                   />
@@ -1042,9 +1042,9 @@ const [isLive, setIsLive] = useState(false);
                 />
 
                 <div>
-                  <label className="text-sm text-neutral-300">Preferred Title</label>
+                  <label className="text-sm font-medium text-[#FFC72C]">Preferred Title</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.preferred_title}
                     onChange={(e) => update("preferred_title", e.target.value)}
                   >
@@ -1058,9 +1058,9 @@ const [isLive, setIsLive] = useState(false);
                 </div>
 
                 <div>
-                  <label className="text-sm text-neutral-300">Controller Type</label>
+                  <label className="text-sm font-medium text-[#FFC72C]">Controller Type</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.controller_type}
                     onChange={(e) => update("controller_type", e.target.value)}
                   >
@@ -1074,9 +1074,9 @@ const [isLive, setIsLive] = useState(false);
                 </div>
 
                 <div>
-                  <label className="text-sm text-neutral-300">Playstyle</label>
+                  <label className="text-sm font-medium text-[#FFC72C]">Playstyle</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.playstyle}
                     onChange={(e) => {
                       update("playstyle", e.target.value);
@@ -1101,7 +1101,7 @@ const [isLive, setIsLive] = useState(false);
             )}
             {form.game_slug === "smash" && (
               <div className="mt-6">
-                <label className="text-sm text-neutral-300">Characters Played</label>
+                <label className="text-sm font-medium text-[#FFC72C]">Characters Played</label>
                 <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                   {smashCharacters.map((char) => (
                     <label key={char} className="flex items-center gap-2">
@@ -1158,11 +1158,11 @@ const [isLive, setIsLive] = useState(false);
             {(form.game_slug === "mario-kart" || form.game_slug === "smash") && (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-sm text-neutral-300">
+                  <label className="text-sm font-medium text-[#FFC72C]">
                     Tournament Experience
                   </label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
                     onChange={(e) => update("tournament_experience", e.target.value)}
                   >
@@ -1174,7 +1174,7 @@ const [isLive, setIsLive] = useState(false);
                 </div>
 
                 <div className="flex flex-col gap-3 pt-6">
-                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                  <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                     <input
                       type="checkbox"
                       checked={form.team_experience}
@@ -1185,7 +1185,7 @@ const [isLive, setIsLive] = useState(false);
                     Team experience
                   </label>
 
-                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                  <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                     <input
                       type="checkbox"
                       checked={form.scrim_experience}
@@ -1203,9 +1203,9 @@ const [isLive, setIsLive] = useState(false);
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {form.game_slug === "fortnite" && (
                   <div>
-                    <label className="text-sm text-neutral-300">Fortnite Mode</label>
+                    <label className="text-sm font-medium text-[#FFC72C]">Fortnite Mode</label>
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.fortnite_mode}
                       onChange={(e) => update("fortnite_mode", e.target.value)}
                       required
@@ -1268,11 +1268,11 @@ const [isLive, setIsLive] = useState(false);
                 />
 
                 <div>
-                  <label className="text-sm text-neutral-300">Current Rank</label>
+                  <label className="text-sm font-medium text-[#FFC72C]">Current Rank</label>
 
                   {form.game_slug === "valorant" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) =>
                         update("current_rank_label", e.target.value)
@@ -1288,7 +1288,7 @@ const [isLive, setIsLive] = useState(false);
                     </select>
                   ) : form.game_slug === "fortnite" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1302,7 +1302,7 @@ const [isLive, setIsLive] = useState(false);
                     </select>
                   ) : form.game_slug === "r6" ? (
                     <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
@@ -1317,7 +1317,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "rocket-league" ? (
                     <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
@@ -1332,7 +1332,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "overwatch" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1347,7 +1347,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "cod" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1362,7 +1362,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "hearthstone" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1377,9 +1377,9 @@ const [isLive, setIsLive] = useState(false);
                     
                   ) : (
                     <>
-                      <input
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
-                        value={form.current_rank_label}
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      value={form.current_rank_label}
                         onChange={(e) =>
                           update("current_rank_label", e.target.value)
                         }
@@ -1430,9 +1430,9 @@ const [isLive, setIsLive] = useState(false);
 
                   <>
                     <div>
-                      <label className="text-sm text-neutral-300">Primary Role</label>
+                      <label className="text-sm font-medium text-[#FFC72C]">Primary Role</label>
                       <select
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                         value={form.primary_role}
                         onChange={(e) => update("primary_role", e.target.value)}
                         required
@@ -1447,11 +1447,11 @@ const [isLive, setIsLive] = useState(false);
                     </div>
 
                     <div>
-                      <label className="text-sm text-neutral-300">
+                      <label className="text-sm font-medium text-[#FFC72C]">
                         Secondary Role
                       </label>
                       <select
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                         value={form.secondary_role}
                         onChange={(e) => update("secondary_role", e.target.value)}
                       >
@@ -1473,11 +1473,11 @@ const [isLive, setIsLive] = useState(false);
                 />
 
                 <div>
-                  <label className="text-sm text-neutral-300">
+                  <label className="text-sm font-medium text-[#FFC72C]">
                     Tournament Experience
                   </label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
                     onChange={(e) =>
                       update("tournament_experience", e.target.value)
@@ -1491,7 +1491,7 @@ const [isLive, setIsLive] = useState(false);
                 </div>
 
                 <div className="flex flex-col gap-3 pt-6">
-                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                  <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                     <input
                       type="checkbox"
                       checked={form.team_experience}
@@ -1502,7 +1502,7 @@ const [isLive, setIsLive] = useState(false);
                     Team experience
                   </label>
 
-                  <label className="flex items-center gap-2 text-sm text-neutral-300">
+                  <label className="flex items-center gap-2 text-sm text-[#FFC72C] hover:text-[#FFD947] transition-colors">
                     <input
                       type="checkbox"
                       checked={form.scrim_experience}
@@ -1521,7 +1521,7 @@ const [isLive, setIsLive] = useState(false);
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-white px-5 py-3 font-medium text-black disabled:opacity-60"
+              className="rounded-xl bg-gradient-to-r from-[#FFC72C] to-[#FFD947] px-6 py-3 font-bold text-[#5C068C] hover:shadow-lg hover:shadow-[#FFC72C]/50 disabled:opacity-60 transition-all duration-200"
             >
               {loading ? "Submitting..." : "Submit Application"}
             </button>
@@ -1531,6 +1531,11 @@ const [isLive, setIsLive] = useState(false);
             {err && (
               <div className="whitespace-pre-wrap rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-300">
                 {err}
+              </div>
+            )}
+            {success && (
+              <div className="whitespace-pre-wrap rounded-lg border border-[#FFC72C] bg-[#5C068C]/30 p-3 text-sm text-[#FFC72C]">
+                {success}
               </div>
             )}
           </div>
@@ -1559,9 +1564,9 @@ function Input({
 }) {
   return (
     <div>
-      <label className="text-sm text-neutral-300">{label}</label>
+      <label className="text-sm font-medium text-[#FFC72C]">{label}</label>
       <input
-        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
+        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
