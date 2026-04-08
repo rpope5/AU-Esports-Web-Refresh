@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, JSON, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
@@ -86,6 +86,7 @@ class RecruitGameProfile(Base):
     team_experience = Column(Boolean, default=False)
     scrim_experience = Column(Boolean, default=False)
     tournament_experience = Column(String)
+    tournament_experience_details = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
