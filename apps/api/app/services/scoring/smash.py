@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from typing import Any
+
+from app.services.scoring.contracts import ScoringResult, make_component, make_explanation
 
 @dataclass
 class SmashInputs:
@@ -59,11 +62,11 @@ def _wins_score(best_wins: str | None) -> float:
     if count >= 5:
         return 100.0
     if count >= 3:
-        return 80.0
+        return 85.0
     if count >= 1:
-        return 60.0
+        return 65.0
 
-    return 0.0
+        return 0.0
 
 
 def _availability_score(hours, wn, we):
@@ -93,7 +96,35 @@ def _completeness(tracker, characters):
     return score
 
 
-def score_smash(inputs: SmashInputs):
+def _build_inputs(payload: Any) -> tuple[SmashInputs, dict[str, Any]]:
+    return (
+        SmashInputs(
+            gsp=payload.profile.gsp or 0,
+            regional_rank=payload.profile.regional_rank,
+            best_wins=payload.profile.best_wins,
+            hours_per_week=payload.availability.hours_per_week,
+            weeknights_available=payload.availability.weeknights_available,
+            weekends_available=payload.availability.weekends_available,
+            tournament_experience=payload.profile.tournament_experience,
+            tracker_url_present=bool(payload.profile.tracker_url),
+            characters_present=bool(payload.profile.characters),
+        ),
+        {
+            "gsp": payload.profile.gsp or 0,
+            "regional_rank": payload.profile.regional_rank,
+            "best_wins": payload.profile.best_wins,
+            "hours_per_week": payload.availability.hours_per_week,
+            "weeknights_available": payload.availability.weeknights_available,
+            "weekends_available": payload.availability.weekends_available,
+            "tournament_experience": payload.profile.tournament_experience,
+            "tracker_url_present": bool(payload.profile.tracker_url),
+            "characters_present": bool(payload.profile.characters),
+        },
+    )
+
+
+def score_smash(payload: Any) -> ScoringResult:
+    inputs, raw_inputs = _build_inputs(payload)
     gsp = _gsp_score(inputs.gsp)
     regional = _regional_score(inputs.regional_rank)
     wins = _wins_score(inputs.best_wins)
@@ -109,21 +140,40 @@ def score_smash(inputs: SmashInputs):
     )
 
     total = (
-        0.35 * gsp +
-        0.20 * regional +
-        0.15 * wins +
+        0.25 * gsp +
+        0.25 * regional +
+        0.20 * wins +
         0.15 * tourney +
         0.10 * availability +
         0.05 * complete
     )
 
-    explanation = {
-        "gsp": round(0.35 * gsp, 2),
-        "regional": round(0.20 * regional, 2),
-        "wins": round(0.15 * wins, 2),
-        "tournament": round(0.15 * tourney, 2),
-        "availability": round(0.10 * availability, 2),
-        "completeness": round(0.05 * complete, 2),
-    }
+    explanation = make_explanation(
+        {
+            "skill_gsp": make_component(gsp, 0.25),
+            "skill_regional": make_component(regional, 0.25),
+            "skill_wins": make_component(wins, 0.20),
+            "experience": make_component(tourney, 0.15),
+            "availability": make_component(availability, 0.10),
+            "completeness": make_component(complete, 0.05),
+        },
+        total,
+    )
 
-    return round(total, 2), explanation
+    return ScoringResult(
+        score=round(total, 2),
+        explanation=explanation,
+        model_version="v1_smash",
+        scoring_method="rules",
+        raw_inputs=raw_inputs,
+        normalized_features={
+            "gsp_score": float(gsp),
+            "regional_score": float(regional),
+            "wins_score": float(wins),
+            "experience": float(tourney),
+            "availability": float(availability),
+            "completeness": float(complete),
+        },
+        current_rank_numeric=None,
+        peak_rank_numeric=None,
+    )

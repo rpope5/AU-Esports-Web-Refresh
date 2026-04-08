@@ -3,6 +3,16 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
 
+RECRUIT_REVIEW_STATUSES = (
+    "NEW",
+    "REVIEWED",
+    "CONTACTED",
+    "TRYOUT",
+    "WATCHLIST",
+    "ACCEPTED",
+    "REJECTED",
+)
+
 class RecruitApplication(Base):
     __tablename__ = "recruit_applications"
 
@@ -40,6 +50,16 @@ class RecruitGameProfile(Base):
 
     ign = Column(String)
     fortnite_mode = Column(String, nullable=True)
+    epic_games_name = Column(String, nullable=True)
+    fortnite_pr = Column(Integer, nullable=True)
+    fortnite_kd = Column(Float, nullable=True)
+    fortnite_total_kills = Column(Integer, nullable=True)
+    fortnite_playtime_hours = Column(Float, nullable=True)
+    fortnite_wins = Column(Integer, nullable=True)
+    faceit_level = Column(Integer, nullable=True)
+    faceit_elo = Column(Integer, nullable=True)
+    cs2_roles = Column(String, nullable=True)
+    prior_team_history = Column(String, nullable=True)
     ranked_wins = Column(Integer, nullable=True)
     years_played = Column(Integer, nullable=True)
     legend_peak_rank = Column(Integer, nullable=True)
@@ -76,10 +96,15 @@ class RecruitRanking(Base):
 
     id = Column(Integer, primary_key=True)
     application_id = Column(Integer, ForeignKey("recruit_applications.id"))
-    game_id = Column(Integer)
+    game_id = Column(Integer, ForeignKey("games.id"))
     score = Column(Float)
     explanation_json = Column(JSON)
     model_version = Column(String)
+    raw_inputs_json = Column(JSON, nullable=False, default=dict)
+    normalized_features_json = Column(JSON, nullable=False, default=dict)
+    scoring_method = Column(String, nullable=False, default="rules")
+    is_current = Column(Boolean, nullable=False, default=True)
+    scored_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     
 class RecruitReview(Base):
@@ -87,8 +112,10 @@ class RecruitReview(Base):
 
     id = Column(Integer, primary_key=True)
     application_id = Column(Integer, ForeignKey("recruit_applications.id"))
-    status = Column(String, default="NEW")
+    status = Column(String, nullable=False, default="NEW")
     reviewer_user_id = Column(Integer, nullable=True)
+    labeled_at = Column(DateTime, nullable=True)
+    label_reason = Column(String, nullable=True)
     notes = Column(String, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

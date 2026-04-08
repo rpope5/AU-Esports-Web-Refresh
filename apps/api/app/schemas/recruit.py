@@ -23,6 +23,16 @@ class RecruitProfileInput(BaseModel):
     scrim_experience: bool
     tournament_experience: Literal["none", "local", "regional", "national"]
     fortnite_mode: str | None = None
+    epic_games_name: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    fortnite_pr: Optional[int] = Field(default=None, ge=0, le=1000000)
+    fortnite_kd: Optional[float] = Field(default=None, ge=0, le=100)
+    fortnite_total_kills: Optional[int] = Field(default=None, ge=0, le=10000000)
+    fortnite_playtime_hours: Optional[float] = Field(default=None, ge=0, le=100000)
+    fortnite_wins: Optional[int] = Field(default=None, ge=0, le=100000)
+    faceit_level: Optional[int] = Field(default=None, ge=1, le=10)
+    faceit_elo: Optional[int] = Field(default=None, ge=0, le=5000)
+    cs2_roles: Optional[str] = Field(default=None, max_length=255)
+    prior_team_history: Optional[str] = Field(default=None, max_length=500)
 
     ranked_wins: Optional[int] = Field(default=None, ge=0, le=50000)
     years_played: Optional[int] = Field(default=None, ge=0, le=30)
@@ -78,7 +88,7 @@ class RecruitApplyInput(BaseModel):
     
     @model_validator(mode="after")
     def validate_profile_by_game(self):
-        if self.game_slug != "smash":
+        if self.game_slug not in {"smash", "mario-kart"}:
             if not self.profile.ign:
                 raise ValueError("ign is required for this game")
             if not self.profile.current_rank_label:

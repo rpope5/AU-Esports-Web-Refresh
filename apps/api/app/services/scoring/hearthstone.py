@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 import re
+from typing import Any
+
+from app.services.scoring.contracts import ScoringResult, make_component, make_explanation
 
 HEARTHSTONE_CLASS_OPTIONS = {
     "Death Knight",
@@ -105,7 +108,50 @@ def _completeness_score(tracker: bool, ign: bool, deck_info: bool) -> float:
     score += 30.0 if deck_info else 0.0
     return float(max(0.0, min(100.0, score)))
 
-def score_hearthstone(inputs: HearthstoneInputs) -> tuple[float, dict]:
+
+def _build_inputs(payload: Any) -> tuple[HearthstoneInputs, float, float | None, dict[str, Any]]:
+    current_rank_numeric = hearthstone_rank_to_numeric(payload.profile.current_rank_label)
+    peak_rank_numeric = (
+        hearthstone_rank_to_numeric(payload.profile.peak_rank_label)
+        if payload.profile.peak_rank_label
+        else None
+    )
+
+    return (
+        HearthstoneInputs(
+            rank_numeric=current_rank_numeric,
+            ranked_wins=payload.profile.ranked_wins or 0,
+            years_played=payload.profile.years_played or 0,
+            legend_peak_rank=payload.profile.legend_peak_rank,
+            hours_per_week=payload.availability.hours_per_week,
+            weeknights_available=payload.availability.weeknights_available,
+            weekends_available=payload.availability.weekends_available,
+            tournament_experience=payload.profile.tournament_experience,
+            tracker_url_present=bool(payload.profile.tracker_url),
+            ign_present=bool(payload.profile.ign),
+            deck_info_present=bool(payload.profile.secondary_role),
+        ),
+        current_rank_numeric,
+        peak_rank_numeric,
+        {
+            "current_rank_label": payload.profile.current_rank_label,
+            "peak_rank_label": payload.profile.peak_rank_label,
+            "ranked_wins": payload.profile.ranked_wins or 0,
+            "years_played": payload.profile.years_played or 0,
+            "legend_peak_rank": payload.profile.legend_peak_rank,
+            "hours_per_week": payload.availability.hours_per_week,
+            "weeknights_available": payload.availability.weeknights_available,
+            "weekends_available": payload.availability.weekends_available,
+            "tournament_experience": payload.profile.tournament_experience,
+            "tracker_url_present": bool(payload.profile.tracker_url),
+            "ign_present": bool(payload.profile.ign),
+            "deck_info_present": bool(payload.profile.secondary_role),
+        },
+    )
+
+
+def score_hearthstone(payload: Any) -> ScoringResult:
+    inputs, current_rank_numeric, peak_rank_numeric, raw_inputs = _build_inputs(payload)
     rank = float(max(0.0, min(100.0, inputs.rank_numeric)))
     wins = _wins_score(inputs.ranked_wins)
     years = _years_score(inputs.years_played)
@@ -130,21 +176,32 @@ def score_hearthstone(inputs: HearthstoneInputs) -> tuple[float, dict]:
         0.10 * legend
     )
 
-    explanation = {
-        "rank": round(0.40 * rank, 2),
-        "experience": round(0.20 * experience, 2),
-        "availability": round(0.15 * availability, 2),
-        "completeness": round(0.15 * complete, 2),
-        "legend_bonus": round(0.10 * legend, 2),
-        "raw": {
+    explanation = make_explanation(
+        {
+            "skill": make_component(rank, 0.40),
+            "experience": make_component(experience, 0.20),
+            "availability": make_component(availability, 0.15),
+            "completeness": make_component(complete, 0.15),
+            "legend_bonus": make_component(legend, 0.10),
+        },
+        total,
+    )
+
+    return ScoringResult(
+        score=round(float(total), 2),
+        explanation=explanation,
+        model_version="v1_hearthstone",
+        scoring_method="rules",
+        raw_inputs=raw_inputs,
+        normalized_features={
             "rank_numeric": rank,
-            "ranked_wins": wins,
-            "years_played": years,
+            "ranked_wins_score": wins,
+            "years_played_score": years,
             "legend_bonus": legend,
             "availability": availability,
             "experience": experience,
             "completeness": complete,
         },
-    }
-
-    return round(float(total), 2), explanation
+        current_rank_numeric=current_rank_numeric,
+        peak_rank_numeric=peak_rank_numeric,
+    )

@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from typing import Any
+
+from app.services.scoring.contracts import ScoringResult, make_component, make_explanation
 
 R6_ROLE_OPTIONS = {"Entry", "Support", "Flex", "IGL", "Anchor", "Roamer"}
 
@@ -66,7 +69,50 @@ def _completeness_score(tracker: bool, ign: bool, roles: bool, peak: bool) -> fl
     score += 20.0 if peak else 0.0
     return float(max(0.0, min(100.0, score)))
 
-def score_r6(inputs: R6Inputs) -> tuple[float, dict]:
+
+def _build_inputs(payload: Any) -> tuple[R6Inputs, float, float | None, dict[str, Any]]:
+    current_rank_numeric = r6_rank_to_numeric(payload.profile.current_rank_label)
+    peak_rank_numeric = (
+        r6_rank_to_numeric(payload.profile.peak_rank_label)
+        if payload.profile.peak_rank_label
+        else None
+    )
+
+    return (
+        R6Inputs(
+            rank_numeric=current_rank_numeric,
+            hours_per_week=payload.availability.hours_per_week,
+            weeknights_available=payload.availability.weeknights_available,
+            weekends_available=payload.availability.weekends_available,
+            team_experience=payload.profile.team_experience,
+            scrim_experience=payload.profile.scrim_experience,
+            tournament_experience=payload.profile.tournament_experience,
+            tracker_url_present=bool(payload.profile.tracker_url),
+            ign_present=bool(payload.profile.ign),
+            roles_present=bool(payload.profile.primary_role),
+            peak_rank_present=bool(payload.profile.peak_rank_label),
+        ),
+        current_rank_numeric,
+        peak_rank_numeric,
+        {
+            "current_rank_label": payload.profile.current_rank_label,
+            "peak_rank_label": payload.profile.peak_rank_label,
+            "hours_per_week": payload.availability.hours_per_week,
+            "weeknights_available": payload.availability.weeknights_available,
+            "weekends_available": payload.availability.weekends_available,
+            "team_experience": payload.profile.team_experience,
+            "scrim_experience": payload.profile.scrim_experience,
+            "tournament_experience": payload.profile.tournament_experience,
+            "tracker_url_present": bool(payload.profile.tracker_url),
+            "ign_present": bool(payload.profile.ign),
+            "roles_present": bool(payload.profile.primary_role),
+            "peak_rank_present": bool(payload.profile.peak_rank_label),
+        },
+    )
+
+
+def score_r6(payload: Any) -> ScoringResult:
+    inputs, current_rank_numeric, peak_rank_numeric, raw_inputs = _build_inputs(payload)
     rank = float(max(0.0, min(100.0, inputs.rank_numeric)))
     availability = _availability_score(
         inputs.hours_per_week,
@@ -92,17 +138,28 @@ def score_r6(inputs: R6Inputs) -> tuple[float, dict]:
         0.10 * complete
     )
 
-    explanation = {
-        "rank": round(0.55 * rank, 2),
-        "availability": round(0.20 * availability, 2),
-        "experience": round(0.15 * experience, 2),
-        "completeness": round(0.10 * complete, 2),
-        "raw": {
+    explanation = make_explanation(
+        {
+            "skill": make_component(rank, 0.55),
+            "availability": make_component(availability, 0.20),
+            "experience": make_component(experience, 0.15),
+            "completeness": make_component(complete, 0.10),
+        },
+        total,
+    )
+
+    return ScoringResult(
+        score=round(float(total), 2),
+        explanation=explanation,
+        model_version="v1_r6",
+        scoring_method="rules",
+        raw_inputs=raw_inputs,
+        normalized_features={
             "rank_numeric": rank,
             "availability": availability,
             "experience": experience,
             "completeness": complete,
         },
-    }
-
-    return round(float(total), 2), explanation
+        current_rank_numeric=current_rank_numeric,
+        peak_rank_numeric=peak_rank_numeric,
+    )
