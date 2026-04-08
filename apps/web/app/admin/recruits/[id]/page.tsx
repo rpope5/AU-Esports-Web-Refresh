@@ -43,10 +43,20 @@ type AvailabilityData = {
 type ProfileData = {
   game_slug?: string | null;
   ign?: string | null;
+  epic_games_name?: string | null;
   current_rank_label?: string | null;
   peak_rank_label?: string | null;
   primary_role?: string | null;
   secondary_role?: string | null;
+  cs2_roles?: string | null;
+  prior_team_history?: string | null;
+  faceit_level?: number | null;
+  faceit_elo?: number | null;
+  fortnite_pr?: number | null;
+  fortnite_kd?: number | null;
+  fortnite_total_kills?: number | null;
+  fortnite_playtime_hours?: number | null;
+  fortnite_wins?: number | null;
   tournament_experience?: string | null;
   tracker_url?: string | null;
   gsp?: number | null;
@@ -317,10 +327,12 @@ export default function RecruitDetailPage() {
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="space-y-2 text-sm">
             <p>IGN / BattleTag: {profile?.ign || "N/A"}</p>
+            {profile?.epic_games_name && <p>Epic Games Name: {profile.epic_games_name}</p>}
             <p>Current Rank: {profile?.current_rank_label || "N/A"}</p>
             <p>Peak Rank: {profile?.peak_rank_label || "N/A"}</p>
             <p>Primary Role / Main Focus: {profile?.primary_role || "N/A"}</p>
             <p>Secondary Role / Extra Info: {profile?.secondary_role || "N/A"}</p>
+            {profile?.cs2_roles && <p>CS2 Additional Roles: {profile.cs2_roles}</p>}
             <p>Tournament Experience: {profile?.tournament_experience || "N/A"}</p>
             {profile?.tracker_url ? (
               <p>
@@ -335,6 +347,14 @@ export default function RecruitDetailPage() {
           </div>
 
           <div className="space-y-2 text-sm">
+            {profile?.faceit_level != null && <p>Faceit Level: {profile.faceit_level}</p>}
+            {profile?.faceit_elo != null && <p>Faceit ELO: {profile.faceit_elo}</p>}
+            {profile?.prior_team_history && <p>Prior Team History: {profile.prior_team_history}</p>}
+            {profile?.fortnite_pr != null && <p>Fortnite PR: {profile.fortnite_pr}</p>}
+            {profile?.fortnite_kd != null && <p>Fortnite K/D: {profile.fortnite_kd}</p>}
+            {profile?.fortnite_total_kills != null && <p>Total Kills: {profile.fortnite_total_kills}</p>}
+            {profile?.fortnite_playtime_hours != null && <p>Playtime (Hours): {profile.fortnite_playtime_hours}</p>}
+            {profile?.fortnite_wins != null && <p>Wins: {profile.fortnite_wins}</p>}
             {profile?.gsp != null && <p>GSP: {profile.gsp}</p>}
             {profile?.regional_rank && <p>Regional Rank: {profile.regional_rank}</p>}
             {profile?.ranked_wins != null && <p>Ranked Wins: {profile.ranked_wins}</p>}

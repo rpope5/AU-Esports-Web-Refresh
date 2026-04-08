@@ -19,6 +19,16 @@ type FormState = {
   weekends_available: boolean;
   game_slug: GameSlug;
   fortnite_mode: string;
+  epic_games_name: string;
+  fortnite_pr: string;
+  fortnite_kd: string;
+  fortnite_total_kills: string;
+  fortnite_playtime_hours: string;
+  fortnite_wins: string;
+  faceit_level: string;
+  faceit_elo: string;
+  cs2_roles: string;
+  prior_team_history: string;
   ign: string;
   current_rank_label: string;
   peak_rank_label: string;
@@ -376,6 +386,16 @@ export default function RecruitPage() {
     weekends_available: false,
     game_slug: "valorant",
     fortnite_mode: "",
+    epic_games_name: "",
+    fortnite_pr: "",
+    fortnite_kd: "",
+    fortnite_total_kills: "",
+    fortnite_playtime_hours: "",
+    fortnite_wins: "",
+    faceit_level: "",
+    faceit_elo: "",
+    cs2_roles: "",
+    prior_team_history: "",
     ign: "",
     current_rank_label: "",
     peak_rank_label: "",
@@ -434,6 +454,16 @@ export default function RecruitPage() {
       ...prev,
       game_slug: game,
       fortnite_mode: "",
+      epic_games_name: "",
+      fortnite_pr: "",
+      fortnite_kd: "",
+      fortnite_total_kills: "",
+      fortnite_playtime_hours: "",
+      fortnite_wins: "",
+      faceit_level: "",
+      faceit_elo: "",
+      cs2_roles: "",
+      prior_team_history: "",
       ign: "",
       current_rank_label: "",
       peak_rank_label: "",
@@ -570,6 +600,40 @@ export default function RecruitPage() {
           ign: form.game_slug === "smash" ? null : form.ign || null,
           fortnite_mode:
             form.game_slug === "fortnite" ? form.fortnite_mode : null,
+          epic_games_name:
+            form.game_slug === "fortnite" ? form.epic_games_name || null : null,
+          fortnite_pr:
+            form.game_slug === "fortnite" && form.fortnite_pr
+              ? Number(form.fortnite_pr)
+              : null,
+          fortnite_kd:
+            form.game_slug === "fortnite" && form.fortnite_kd
+              ? Number(form.fortnite_kd)
+              : null,
+          fortnite_total_kills:
+            form.game_slug === "fortnite" && form.fortnite_total_kills
+              ? Number(form.fortnite_total_kills)
+              : null,
+          fortnite_playtime_hours:
+            form.game_slug === "fortnite" && form.fortnite_playtime_hours
+              ? Number(form.fortnite_playtime_hours)
+              : null,
+          fortnite_wins:
+            form.game_slug === "fortnite" && form.fortnite_wins
+              ? Number(form.fortnite_wins)
+              : null,
+          faceit_level:
+            form.game_slug === "cs2" && form.faceit_level
+              ? Number(form.faceit_level)
+              : null,
+          faceit_elo:
+            form.game_slug === "cs2" && form.faceit_elo
+              ? Number(form.faceit_elo)
+              : null,
+          cs2_roles:
+            form.game_slug === "cs2" ? form.cs2_roles || null : null,
+          prior_team_history:
+            form.game_slug === "cs2" ? form.prior_team_history || null : null,
           current_rank_label:
             form.game_slug === "smash" ? null : form.current_rank_label || null,
           peak_rank_label:
@@ -637,6 +701,16 @@ export default function RecruitPage() {
         weeknights_available: true,
         weekends_available: false,
         fortnite_mode: "",
+        epic_games_name: "",
+        fortnite_pr: "",
+        fortnite_kd: "",
+        fortnite_total_kills: "",
+        fortnite_playtime_hours: "",
+        fortnite_wins: "",
+        faceit_level: "",
+        faceit_elo: "",
+        cs2_roles: "",
+        prior_team_history: "",
         ign: "",
         current_rank_label: "",
         peak_rank_label: "",
@@ -1142,6 +1216,50 @@ const [isLive, setIsLive] = useState(false);
                     </select>
                   </div>
                 )}
+                {form.game_slug === "fortnite" && (
+                  <>
+                    <Input
+                      label="Epic Games Name"
+                      value={form.epic_games_name}
+                      onChange={(v) => update("epic_games_name", v)}
+                    />
+                    <Input
+                      label="Fortnite PR (Tracker)"
+                      value={form.fortnite_pr}
+                      onChange={(v) => update("fortnite_pr", v)}
+                      type="number"
+                      min={0}
+                    />
+                    <Input
+                      label="Fortnite K/D"
+                      value={form.fortnite_kd}
+                      onChange={(v) => update("fortnite_kd", v)}
+                      type="number"
+                      min={0}
+                    />
+                    <Input
+                      label="Total Kills"
+                      value={form.fortnite_total_kills}
+                      onChange={(v) => update("fortnite_total_kills", v)}
+                      type="number"
+                      min={0}
+                    />
+                    <Input
+                      label="Playtime (Hours)"
+                      value={form.fortnite_playtime_hours}
+                      onChange={(v) => update("fortnite_playtime_hours", v)}
+                      type="number"
+                      min={0}
+                    />
+                    <Input
+                      label="Wins"
+                      value={form.fortnite_wins}
+                      onChange={(v) => update("fortnite_wins", v)}
+                      type="number"
+                      min={0}
+                    />
+                  </>
+                )}
                 <Input
                   label="In-Game Name"
                   value={form.ign}
@@ -1265,7 +1383,7 @@ const [isLive, setIsLive] = useState(false);
                         onChange={(e) =>
                           update("current_rank_label", e.target.value)
                         }
-                        placeholder="Example: Faceit 7 or Premier 18500"
+                        placeholder="Example: Global Elite or Premier 18500"
                         required
                       />
                       <p className="mt-1 text-xs text-neutral-500">
@@ -1280,6 +1398,35 @@ const [isLive, setIsLive] = useState(false);
                   value={form.peak_rank_label}
                   onChange={(v) => update("peak_rank_label", v)}
                 />
+                {form.game_slug === "cs2" && (
+                  <>
+                    <Input
+                      label="Faceit Level (1-10)"
+                      value={form.faceit_level}
+                      onChange={(v) => update("faceit_level", v)}
+                      type="number"
+                      min={1}
+                      max={10}
+                    />
+                    <Input
+                      label="Faceit ELO"
+                      value={form.faceit_elo}
+                      onChange={(v) => update("faceit_elo", v)}
+                      type="number"
+                      min={0}
+                    />
+                    <Input
+                      label="CS2 Roles (Additional)"
+                      value={form.cs2_roles}
+                      onChange={(v) => update("cs2_roles", v)}
+                    />
+                    <Input
+                      label="Prior Team History"
+                      value={form.prior_team_history}
+                      onChange={(v) => update("prior_team_history", v)}
+                    />
+                  </>
+                )}
 
                   <>
                     <div>
