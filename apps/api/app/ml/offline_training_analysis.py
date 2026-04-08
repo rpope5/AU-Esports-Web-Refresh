@@ -33,6 +33,10 @@ KNOWN_STATUSES = {
     "REJECTED",
 }
 DEFAULT_THRESHOLDS = [50.0, 60.0, 70.0, 80.0, 90.0]
+GLOBAL_REVIEW_SOON_THRESHOLD = 70.0
+GLOBAL_VERY_HIGH_CONFIDENCE_THRESHOLD = 90.0
+SMASH_REVIEW_SOON_THRESHOLD = 50.0
+SMASH_HIGH_PRIORITY_THRESHOLD = 60.0
 
 
 @dataclass
@@ -71,6 +75,7 @@ def parse_args() -> argparse.Namespace:
         default="triage_positive",
     )
     parser.add_argument("--run-logistic", action="store_true")
+    parser.add_argument("--run-gradient-boosting", action="store_true")
     parser.add_argument("--min-game-sample", type=int, default=5)
     parser.add_argument("--norm-min-coverage", type=float, default=0.3)
     parser.add_argument("--max-norm-features", type=int, default=10)
@@ -260,6 +265,56 @@ def threshold_metrics(y_true: list[int], y_score: list[float], threshold: float)
         "recall": round(recall, 4),
         "specificity": round(specificity, 4),
     }
+
+
+def confusion_from_predictions(y_true: list[int], y_pred: list[int]) -> dict[str, int]:
+    tp = fp = tn = fn = 0
+    for y, pred in zip(y_true, y_pred):
+        if pred == 1 and y == 1:
+            tp += 1
+        elif pred == 1 and y == 0:
+            fp += 1
+        elif pred == 0 and y == 0:
+            tn += 1
+        else:
+            fn += 1
+    return {"tn": tn, "fp": fp, "fn": fn, "tp": tp}
+
+
+def metrics_from_predictions(y_true: list[int], y_pred: list[int]) -> dict[str, Any]:
+    cm = confusion_from_predictions(y_true, y_pred)
+    tp = cm["tp"]
+    fp = cm["fp"]
+    tn = cm["tn"]
+    fn = cm["fn"]
+    total = len(y_true)
+
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    specificity = tn / (tn + fp) if (tn + fp) else 0.0
+    accuracy = (tp + tn) / total if total else 0.0
+
+    return {
+        "precision": round(precision, 4),
+        "recall": round(recall, 4),
+        "specificity": round(specificity, 4),
+        "accuracy": round(accuracy, 4),
+        "confusion_matrix": cm,
+    }
+
+
+def rules_threshold_for_row(game_slug: str, mode: str) -> float:
+    slug = (game_slug or "").strip().lower()
+    if mode == "accepted_only":
+        return SMASH_HIGH_PRIORITY_THRESHOLD if slug == "smash" else GLOBAL_VERY_HIGH_CONFIDENCE_THRESHOLD
+    return SMASH_REVIEW_SOON_THRESHOLD if slug == "smash" else GLOBAL_REVIEW_SOON_THRESHOLD
+
+
+def rules_prediction_for_row(row: ParsedRow, mode: str) -> int:
+    if row.score is None:
+        return 0
+    threshold = rules_threshold_for_row(row.game_slug, mode)
+    return 1 if float(row.score) >= threshold else 0
 
 
 def compare_rules_score(rows: list[ParsedRow], mode: str) -> dict[str, Any]:
@@ -563,11 +618,86 @@ def select_numeric_normalized_feature_keys(rows: list[ParsedRow], min_coverage_r
     return candidates[:max_features]
 
 
+def _build_feature_rows(
+    labeled_rows: list[ParsedRow], selected_keys: list[str], mode: str
+) -> tuple[list[dict[str, Any]], list[int]]:
+    X_dict: list[dict[str, Any]] = []
+    y: list[int] = []
+    for row in labeled_rows:
+        feature_row: dict[str, Any] = {"score": float(row.score), "game_slug": row.game_slug}
+        for key in selected_keys:
+            value = to_float(row.normalized_features.get(key))
+            if value is not None:
+                feature_row[f"norm__{key}"] = value
+        X_dict.append(feature_row)
+        y.append(target_value(row.review_status, mode))
+    return X_dict, y
+
+
+def _evaluate_probability_model(y_true: list[int], probabilities: list[float], decision_threshold: float = 0.5) -> dict[str, Any]:
+    preds = [1 if p >= decision_threshold else 0 for p in probabilities]
+    class_metrics = metrics_from_predictions(y_true, preds)
+    return {
+        "auc": auc_from_scores(y_true, probabilities),
+        "precision": class_metrics["precision"],
+        "recall": class_metrics["recall"],
+        "specificity": class_metrics["specificity"],
+        "accuracy": class_metrics["accuracy"],
+        "confusion_matrix": class_metrics["confusion_matrix"],
+        "decision_threshold": decision_threshold,
+    }
+
+
+def _build_comparison_recommendation(mode: str, rules_metrics: dict[str, Any], logistic_metrics: dict[str, Any]) -> dict[str, Any]:
+    if mode != "triage_positive":
+        return {
+            "summary": "Triage-positive should be used as the primary capstone comparison target; accepted-only is secondary due to class imbalance.",
+            "production_recommendation": "Keep rules-based scoring as production default for now.",
+            "future_ml_path": "Collect more ACCEPTED outcomes before considering accepted-only modeling.",
+        }
+
+    rules_auc = rules_metrics.get("auc")
+    logistic_auc = logistic_metrics.get("auc")
+    if rules_auc is None or logistic_auc is None:
+        return {
+            "summary": "AUC comparison was inconclusive on this split.",
+            "production_recommendation": "Keep rules-based scoring as production default.",
+            "future_ml_path": "Increase labeled sample size and rerun with repeated cross-validation.",
+        }
+
+    delta_auc = round(float(logistic_auc) - float(rules_auc), 4)
+    if delta_auc <= 0.03:
+        return {
+            "summary": f"Logistic AUC improvement over rules is small (delta={delta_auc}).",
+            "production_recommendation": (
+                "Rules-based scoring remains the preferred production choice for explainability and maintainability. "
+                "ML should remain an offline future extension path."
+            ),
+            "future_ml_path": (
+                "Continue collecting labels and revisit ML when data volume and label stability improve."
+            ),
+        }
+    if delta_auc <= 0.08:
+        return {
+            "summary": f"Logistic AUC shows moderate improvement over rules (delta={delta_auc}).",
+            "production_recommendation": (
+                "Keep rules-based scoring in production for now and run further offline validation before any live ML pilot."
+            ),
+            "future_ml_path": "Run repeated splits/per-game validation to verify this gain is stable.",
+        }
+    return {
+        "summary": f"Logistic AUC shows strong improvement over rules (delta={delta_auc}).",
+        "production_recommendation": (
+            "Rules should remain the current production default while planning a controlled future ML pilot with guardrails."
+        ),
+        "future_ml_path": "Validate on larger and fresher cohorts before considering live integration.",
+    }
+
+
 def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Namespace) -> dict[str, Any]:
     try:
         from sklearn.feature_extraction import DictVectorizer
         from sklearn.linear_model import LogisticRegression
-        from sklearn.metrics import confusion_matrix, precision_score, recall_score, roc_auc_score
         from sklearn.model_selection import train_test_split
     except ImportError:
         return {"ran": False, "reason": "scikit-learn not installed. Install it in the analysis environment to enable this step."}
@@ -580,27 +710,22 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
         labeled_rows, min_coverage_ratio=args.norm_min_coverage, max_features=args.max_norm_features
     )
     selected_keys = [row["key"] for row in feature_candidates]
-
-    X_dict: list[dict[str, Any]] = []
-    y: list[int] = []
-    for row in labeled_rows:
-        feature_row: dict[str, Any] = {"score": float(row.score), "game_slug": row.game_slug}
-        for key in selected_keys:
-            value = to_float(row.normalized_features.get(key))
-            if value is not None:
-                feature_row[f"norm__{key}"] = value
-        X_dict.append(feature_row)
-        y.append(target_value(row.review_status, mode))
+    X_dict, y = _build_feature_rows(labeled_rows, selected_keys, mode)
 
     positives = sum(y)
     negatives = len(y) - positives
     if positives == 0 or negatives == 0:
         return {"ran": False, "reason": "Only one class present for selected target mode."}
 
+    indices = list(range(len(X_dict)))
     stratify_target = y if positives >= 2 and negatives >= 2 else None
-    X_train_dict, X_test_dict, y_train, y_test = train_test_split(
-        X_dict, y, test_size=0.3, random_state=42, stratify=stratify_target
-    )
+    train_idx, test_idx = train_test_split(indices, test_size=0.3, random_state=42, stratify=stratify_target)
+
+    X_train_dict = [X_dict[i] for i in train_idx]
+    X_test_dict = [X_dict[i] for i in test_idx]
+    y_train = [y[i] for i in train_idx]
+    y_test = [y[i] for i in test_idx]
+    test_rows = [labeled_rows[i] for i in test_idx]
 
     vectorizer = DictVectorizer(sparse=True)
     X_train = vectorizer.fit_transform(X_train_dict)
@@ -608,16 +733,72 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
 
     model = LogisticRegression(max_iter=1000, class_weight="balanced")
     model.fit(X_train, y_train)
-    proba = model.predict_proba(X_test)[:, 1]
-    pred = (proba >= 0.5).astype(int)
-    tn, fp, fn, tp = confusion_matrix(y_test, pred, labels=[0, 1]).ravel()
-    auc = roc_auc_score(y_test, proba) if len(set(y_test)) == 2 else None
+    logistic_proba = [float(v) for v in model.predict_proba(X_test)[:, 1]]
+    logistic_metrics = _evaluate_probability_model(y_test, logistic_proba, decision_threshold=0.5)
+
+    rules_scores = [float(r.score) for r in test_rows if r.score is not None]
+    rules_auc = auc_from_scores(y_test, rules_scores)
+    rules_pred = [rules_prediction_for_row(r, mode) for r in test_rows]
+    rules_classification = metrics_from_predictions(y_test, rules_pred)
+    rules_baseline = {
+        "auc": rules_auc,
+        "precision": rules_classification["precision"],
+        "recall": rules_classification["recall"],
+        "specificity": rules_classification["specificity"],
+        "accuracy": rules_classification["accuracy"],
+        "confusion_matrix": rules_classification["confusion_matrix"],
+        "decision_policy": (
+            "score >= 70 for most games, >= 50 for Smash (triage-positive). "
+            "Accepted-only fallback uses >= 90 for most games and >= 60 for Smash."
+        ),
+    }
 
     feature_names = vectorizer.get_feature_names_out()
     coefs = model.coef_[0]
     weighted_features = sorted(zip(feature_names, coefs), key=lambda item: item[1], reverse=True)
     top_positive = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[:8]]
     top_negative = [{"feature": f, "coef": round(float(c), 6)} for f, c in weighted_features[-8:]]
+
+    delta_auc = None
+    if rules_baseline["auc"] is not None and logistic_metrics["auc"] is not None:
+        delta_auc = round(float(logistic_metrics["auc"]) - float(rules_baseline["auc"]), 4)
+    delta_precision = round(float(logistic_metrics["precision"]) - float(rules_baseline["precision"]), 4)
+    delta_recall = round(float(logistic_metrics["recall"]) - float(rules_baseline["recall"]), 4)
+
+    comparison = {
+        "target_mode": mode,
+        "rules_baseline_test_metrics": rules_baseline,
+        "logistic_test_metrics": logistic_metrics,
+        "delta_logistic_minus_rules": {
+            "auc": delta_auc,
+            "precision": delta_precision,
+            "recall": delta_recall,
+        },
+        "recommendation": _build_comparison_recommendation(mode, rules_baseline, logistic_metrics),
+    }
+
+    gradient_boosting_result: dict[str, Any] | None = None
+    if args.run_gradient_boosting:
+        try:
+            from sklearn.ensemble import GradientBoostingClassifier
+        except ImportError:
+            gradient_boosting_result = {"ran": False, "reason": "scikit-learn GradientBoostingClassifier unavailable."}
+        else:
+            gb = GradientBoostingClassifier(random_state=42)
+            gb.fit(X_train.toarray(), y_train)
+            gb_proba = [float(v) for v in gb.predict_proba(X_test.toarray())[:, 1]]
+            gb_metrics = _evaluate_probability_model(y_test, gb_proba, decision_threshold=0.5)
+            feature_importance_ranked = sorted(
+                zip(feature_names, gb.feature_importances_), key=lambda item: item[1], reverse=True
+            )
+            gradient_boosting_result = {
+                "ran": True,
+                "metrics": gb_metrics,
+                "top_feature_importance": [
+                    {"feature": f, "importance": round(float(v), 6)}
+                    for f, v in feature_importance_ranked[:10]
+                ],
+            }
 
     return {
         "ran": True,
@@ -642,10 +823,10 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
             "positive_rate_pct": round(pct(positives, len(y)), 2),
         },
         "metrics": {
-            "test_auc": round(float(auc), 4) if auc is not None else None,
-            "test_precision": round(float(precision_score(y_test, pred, zero_division=0)), 4),
-            "test_recall": round(float(recall_score(y_test, pred, zero_division=0)), 4),
-            "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
+            "test_auc": logistic_metrics["auc"],
+            "test_precision": logistic_metrics["precision"],
+            "test_recall": logistic_metrics["recall"],
+            "confusion_matrix": logistic_metrics["confusion_matrix"],
         },
         "model_details": {
             "model_type": "LogisticRegression",
@@ -654,6 +835,8 @@ def run_optional_logistic(rows: list[ParsedRow], mode: str, args: argparse.Names
             "top_positive_coefficients": top_positive,
             "top_negative_coefficients": top_negative,
         },
+        "comparison_vs_rules_baseline": comparison,
+        "gradient_boosting_experiment": gradient_boosting_result,
     }
 
 
@@ -693,7 +876,17 @@ def build_report(rows: list[ParsedRow], args: argparse.Namespace) -> dict[str, A
     }
 
     if args.run_logistic:
-        report["logistic_experiment"] = run_optional_logistic(rows, args.target_mode, args)
+        logistic_result = run_optional_logistic(rows, args.target_mode, args)
+        report["logistic_experiment"] = logistic_result
+        if logistic_result.get("ran"):
+            report["ml_comparison"] = {
+                "primary_target": "triage_positive",
+                "secondary_target_note": "accepted_only is reported for reference only due to severe class imbalance.",
+                "comparison": logistic_result.get("comparison_vs_rules_baseline"),
+                "logistic_feature_set": logistic_result.get("feature_set"),
+                "logistic_model_details": logistic_result.get("model_details"),
+                "gradient_boosting_experiment": logistic_result.get("gradient_boosting_experiment"),
+            }
 
     return report
 
@@ -775,6 +968,35 @@ def print_summary(report: dict[str, Any]) -> None:
                 f"auc={m['test_auc']} precision={m['test_precision']} recall={m['test_recall']} "
                 f"cm=[tn={cm['tn']}, fp={cm['fp']}, fn={cm['fn']}, tp={cm['tp']}]"
             )
+            comparison = logistic.get("comparison_vs_rules_baseline")
+            if comparison:
+                rules = comparison.get("rules_baseline_test_metrics", {})
+                delta = comparison.get("delta_logistic_minus_rules", {})
+                rec = comparison.get("recommendation", {})
+                rules_cm = rules.get("confusion_matrix", {})
+                print(
+                    "Rules baseline on same test split: "
+                    f"auc={rules.get('auc')} precision={rules.get('precision')} recall={rules.get('recall')} "
+                    f"cm=[tn={rules_cm.get('tn')}, fp={rules_cm.get('fp')}, fn={rules_cm.get('fn')}, tp={rules_cm.get('tp')}]"
+                )
+                print(
+                    "Logistic minus rules delta: "
+                    f"auc={delta.get('auc')} precision={delta.get('precision')} recall={delta.get('recall')}"
+                )
+                if rec:
+                    print(f"Recommendation: {rec.get('production_recommendation')}")
+                    print(f"Why: {rec.get('summary')}")
+
+            gb = logistic.get("gradient_boosting_experiment")
+            if isinstance(gb, dict):
+                if gb.get("ran"):
+                    gb_metrics = gb.get("metrics", {})
+                    print(
+                        "Gradient boosting (secondary, offline): "
+                        f"auc={gb_metrics.get('auc')} precision={gb_metrics.get('precision')} recall={gb_metrics.get('recall')}"
+                    )
+                else:
+                    print(f"Gradient boosting skipped: {gb.get('reason')}")
         else:
             print(f"\nLogistic experiment skipped: {logistic.get('reason')}")
 
