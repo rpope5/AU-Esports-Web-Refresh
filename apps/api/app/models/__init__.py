@@ -1,6 +1,7 @@
 # Import all models so Alembic can detect them
 
 from .admin_user import AdminUser
+from .announcement import EsportsAnnouncement
 from .game import Game
 from .recruit import (
     RecruitApplication,
@@ -14,6 +15,7 @@ from .roster import Player
 # Optional but nice: define __all__
 __all__ = [
     "AdminUser",
+    "EsportsAnnouncement",
     "Game",
     "RecruitApplication",
     "RecruitAvailability",

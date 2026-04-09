@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 
 const gameCards = [
   {
+    name: "Announcements",
+    href: "/admin/news",
+    description: "Create and manage esports news announcements",
+  },
+  {
     name: "Valorant",
     href: "/admin/recruits/valorant",
     description: "View and manage Valorant recruits",

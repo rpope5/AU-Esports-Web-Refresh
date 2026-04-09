@@ -1,137 +1,160 @@
 "use client";
-import { useState, useEffect } from "react";
-import Image from 'next/image'
-import Link from 'next/link'
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+
+type Match = {
+  id: number;
+  ourTeam: string;
+  opponent: string;
+  game: string;
+  time: string;
+};
+
+type Announcement = {
+  id: number;
+  title: string;
+  body: string;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+const DEFAULT_NEWS_PLACEHOLDER = "/images/esports-news-placeholder.jpg";
+
+function resolveAnnouncementImage(imageUrl: string | null, apiUrl: string): string {
+  if (!imageUrl || !imageUrl.trim()) return DEFAULT_NEWS_PLACEHOLDER;
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
+  if (imageUrl.startsWith("/uploads")) return `${apiUrl}${imageUrl}`;
+  if (imageUrl.startsWith("/")) return imageUrl;
+  return `${apiUrl}/${imageUrl}`;
+}
+
+function formatPostedDate(rawValue: string): string {
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(rawValue);
+  const normalized = hasTimezone ? rawValue : `${rawValue}Z`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "Unknown date";
+  return parsed.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function bodyPreview(body: string, maxLength = 220): string {
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trim()}...`;
+}
+
+export default function NewsPage() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
-
-  const pageMap: { [key: string]: string } = {
-    "Home": "/",
-    "Roster": "/roster",
-    "Schedule": "/schedule",
-    "News": "/news",
-    "Stream": "/stream",
-    "Recruitment": "/recruit",
-    "Facility": "/facility",
-    "Support": "/support"
+  const pageMap: Record<string, string> = {
+    Home: "/",
+    Roster: "/roster",
+    Schedule: "/schedule",
+    News: "/news",
+    Stream: "/stream",
+    Recruitment: "/recruit",
+    Facility: "/facility",
+    Support: "/support",
   };
 
-  const conferences = [
-    "ECAC",
-    "GLEC",
-    "NECC",
-    "CKL",
-    "PlayVS",
-    "CCL"
-  ];
-  const conferenceImages = [
-    '/ECAC.jpg',
-    '/GLEC.jpg',
-    '/NECC.jpg',
-    '/CKL.png',
-    '/PlayVS.jpg',
-    '/CCL.jpg',
-  ];
-  
-  
-  const displayConferences = [...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences];
-  const displayImages = [...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages];
-  
-  const [currentConfIndex, setCurrentConfIndex] = useState(0);
-  const [selectedConf, setSelectedConf] = useState<string | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [matchStart, setMatchStart] = useState(0);
+  const matchesToShow = 5;
+  const [isLive, setIsLive] = useState(false);
 
-  const [matches, setMatches] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingNews, setLoadingNews] = useState(true);
+  const [newsError, setNewsError] = useState<string | null>(null);
+
   useEffect(() => {
-
-    const tryLoad = async () => {
+    const tryLoadMatches = async () => {
       try {
-        const resX = await fetch('/data/matches.xlsx');
+        const resX = await fetch("/data/matches.xlsx");
         if (resX.ok) {
           const buffer = await resX.arrayBuffer();
-          const XLSX = await import('xlsx' as any).catch(() => null);
-          if (!XLSX) throw new Error('xlsx not available');
-          const wb = XLSX.read(buffer, { type: 'array' });
+          const XLSX = await import("xlsx").catch(() => null);
+          if (!XLSX) throw new Error("xlsx not available");
+          const wb = XLSX.read(buffer, { type: "array" });
           const sheetName = wb.SheetNames[0];
           const ws = wb.Sheets[sheetName];
-          const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
           if (Array.isArray(raw) && raw.length) {
-            const parsed = raw.map((r: any, i: number) => ({
-              id: r.id ?? i + 1,
-              ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
-              opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
-              game: r.game ?? r.Game ?? r.Platform ?? '',
-              time: r.time ?? r.Time ?? r.datetime ?? ''
-            }));
+            const pickString = (
+              row: Record<string, unknown>,
+              ...keys: string[]
+            ): string | undefined => {
+              for (const key of keys) {
+                const value = row[key];
+                if (typeof value === "string" && value.trim()) return value;
+              }
+              return undefined;
+            };
+
+            const parsed: Match[] = raw.map((row, index) => {
+              const record = row as Record<string, unknown>;
+              return {
+                id: Number(record.id) || index + 1,
+                ourTeam: pickString(record, "ourTeam", "OurTeam", "Team") || "Ashland",
+                opponent: pickString(record, "opponent", "Opponent", "Opp") || "",
+                game: pickString(record, "game", "Game", "Platform") || "",
+                time: pickString(record, "time", "Time", "datetime") || "",
+              };
+            });
             setMatches(parsed);
             return;
           }
         }
-      } catch (e) {
-      
+      } catch {
+        // Best-effort data loading. Falls through to CSV/JSON.
       }
 
       try {
-        const resC = await fetch('/data/matches.csv');
+        const resC = await fetch("/data/matches.csv");
         if (resC.ok) {
           const txt = await resC.text();
-          const rows = txt.trim().split('\n').map((r) => r.split(','));
+          const rows = txt.trim().split("\n").map((row) => row.split(","));
           const headers = rows.shift() || [];
-          const parsed = rows.map((cols, i) => {
-            const obj: any = {};
-            headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
+          const parsed: Match[] = rows.map((cols, index) => {
+            const obj: Record<string, string> = {};
+            headers.forEach((header, headerIndex) => {
+              obj[header.trim()] = cols[headerIndex] ? cols[headerIndex].trim() : "";
+            });
             return {
-              id: Number(obj.id) || i + 1,
-              ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
-              opponent: obj.opponent || obj.Opponent || '',
-              game: obj.game || obj.Game || '',
-              time: obj.time || obj.Time || ''
+              id: Number(obj.id) || index + 1,
+              ourTeam: obj.ourTeam || obj.OurTeam || "Ashland",
+              opponent: obj.opponent || obj.Opponent || "",
+              game: obj.game || obj.Game || "",
+              time: obj.time || obj.Time || "",
             };
           });
-          if (parsed.length) { setMatches(parsed); return; }
+          if (parsed.length) {
+            setMatches(parsed);
+            return;
+          }
         }
-      } catch (e) {
+      } catch {
+        // Best-effort data loading. Falls through to JSON.
       }
 
       try {
-        const r = await fetch('/data/matches.json');
-        if (!r.ok) throw new Error('failed');
-        const data = await r.json();
-        if (Array.isArray(data) && data.length) setMatches(data);
-      } catch (e) {
+        const response = await fetch("/data/matches.json");
+        if (!response.ok) throw new Error("Failed to load JSON matches");
+        const data = await response.json();
+        if (Array.isArray(data) && data.length) {
+          setMatches(data as Match[]);
+        }
+      } catch {
+        setMatches([]);
       }
     };
-    tryLoad();
+
+    tryLoadMatches();
   }, []);
-
-  const [matchStart, setMatchStart] = useState(0);
-  const matchesToShow = 5;
-  const prevMatches = () => setMatchStart((s) => Math.max(0, s - 1));
-  const nextMatches = () => setMatchStart((s) => Math.min(Math.max(0, matches.length - matchesToShow), s + 1));
-
-  const prev = () => {
-    setCurrentConfIndex((prevIndex) => (prevIndex === 0 ? displayConferences.length - 1 : prevIndex - 1));
-  };
-
-  const next = () => {
-    setCurrentConfIndex((prevIndex) => prevIndex + 1);
-  };
-
-  
-  useEffect(() => {
-    if (currentConfIndex >= conferences.length * 10) {
-      setCurrentConfIndex(0);
-    }
-  }, [currentConfIndex]);
-
- 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setCurrentConfIndex((i) => i + 1);
-    }, 3000);
-    return () => clearInterval(id);
-  }, []);
-const [isLive, setIsLive] = useState(false);
 
   useEffect(() => {
     const checkLiveStatus = async () => {
@@ -148,78 +171,219 @@ const [isLive, setIsLive] = useState(false);
     const interval = setInterval(checkLiveStatus, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      setLoadingNews(true);
+      setNewsError(null);
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/news?limit=50`);
+        if (!response.ok) {
+          const responseText = await response.text();
+          throw new Error(responseText || "Failed to load announcements");
+        }
+        const data = (await response.json()) as Announcement[];
+        setAnnouncements(Array.isArray(data) ? data : []);
+      } catch (e: unknown) {
+        setNewsError(e instanceof Error ? e.message : "Failed to load announcements");
+      } finally {
+        setLoadingNews(false);
+      }
+    };
+
+    loadAnnouncements();
+  }, [apiUrl]);
+
+  const featuredAnnouncement = useMemo(() => announcements[0] ?? null, [announcements]);
+  const archiveAnnouncements = useMemo(() => announcements.slice(1), [announcements]);
+
+  const prevMatches = () => setMatchStart((current) => Math.max(0, current - 1));
+  const nextMatches = () =>
+    setMatchStart((current) => Math.min(Math.max(0, matches.length - matchesToShow), current + 1));
+
   return (
-    <div className="min-hscreen bg-black text-white">
+    <div className="min-h-screen bg-black text-white">
       <div className="match-bar">
-        <button className="match-arrow" onClick={prevMatches} aria-label="Previous matches" disabled={matchStart === 0}>&larr;</button>
+        <button
+          className="match-arrow"
+          onClick={prevMatches}
+          aria-label="Previous matches"
+          disabled={matchStart === 0}
+        >
+          &larr;
+        </button>
         <div className="match-list">
-          {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-            <div className="match-item" key={m.id}>
+          {matches.slice(matchStart, matchStart + matchesToShow).map((match) => (
+            <div className="match-item" key={match.id}>
               <div className="match-teams">
-                <span className="team-name">{m.ourTeam}</span>
+                <span className="team-name">{match.ourTeam}</span>
                 <span className="versus">vs</span>
-                <span className="team-opponent">{m.opponent}</span>
+                <span className="team-opponent">{match.opponent}</span>
               </div>
-              <div className="match-game">{m.game}</div>
-              <div className="match-time">{m.time}</div>
+              <div className="match-game">{match.game}</div>
+              <div className="match-time">{match.time}</div>
             </div>
           ))}
         </div>
-        <button className="match-arrow" onClick={nextMatches} aria-label="Next matches" disabled={matchStart >= matches.length - matchesToShow}>&rarr;</button>
+        <button
+          className="match-arrow"
+          onClick={nextMatches}
+          aria-label="Next matches"
+          disabled={matchStart >= matches.length - matchesToShow}
+        >
+          &rarr;
+        </button>
       </div>
 
-       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
-
+      <header className="site-header flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
         <div className="flex items-center gap-2">
           <Image
             src="/Eagles (2).png"
             alt="Ashland Eagle Logo"
             width={90}
             height={90}
-            className="w-14 h-14 md:w-20 md:h-20 object-contain"
+            className="h-14 w-14 object-contain md:h-20 md:w-20"
           />
-
           <div className="flex items-center gap-3">
             <h1
-              className="title title-3d text-lg md:text-2xl font-bold tracking-wide"
+              className="title title-3d text-lg font-bold tracking-wide md:text-2xl"
               style={{ textShadow: "1px 1px #333" }}
             >
               Ashland University Esports
             </h1>
-
             {isLive && (
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFC72C] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-[#FFC72C]"></span>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FFC72C] opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-[#FFC72C]" />
                 </span>
-
-                <span className="text-[#FFC72C] text-sm font-semibold">
-                  LIVE
-                </span>
+                <span className="text-sm font-semibold text-[#FFC72C]">LIVE</span>
               </div>
             )}
           </div>
         </div>
 
         <nav className="nav-buttons flex flex-wrap justify-center gap-6 text-sm md:text-base">
-          {pages.map((page) => {
-            const href = pageMap[page] || "/";
-
-            return (
-              <Link key={page} href={href} className="relative group">
-                {page}
-                <span className="absolute left-0 -bottom-1 w-0 h-[2px] bg-[#FFC72C] transition-all duration-300 group-hover:w-full"></span>
-              </Link>
-            );
-          })}
+          {pages.map((page) => (
+            <Link key={page} href={pageMap[page] || "/"} className="relative group">
+              {page}
+              <span className="absolute -bottom-1 left-0 h-[2px] w-0 bg-[#FFC72C] transition-all duration-300 group-hover:w-full" />
+            </Link>
+          ))}
         </nav>
-
       </header>
 
-      <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
+      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70" />
 
+      <main className="mx-auto w-full max-w-6xl px-4 pb-14 pt-8 md:px-8">
+        <section className="mb-7">
+          <p className="text-xs uppercase tracking-[0.3em] text-[#FFC72C]/90">Official Updates</p>
+          <h2 className="mt-2 text-3xl font-bold md:text-4xl">News & Announcements</h2>
+          <p className="mt-3 max-w-3xl text-sm text-neutral-300 md:text-base">
+            Stay up to date with the latest Ashland University Esports results, roster updates, and
+            program announcements.
+          </p>
+        </section>
 
+        {loadingNews ? (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-950 p-6">
+            <p className="text-neutral-300">Loading announcements...</p>
+          </section>
+        ) : newsError ? (
+          <section className="rounded-2xl border border-red-800 bg-red-950/40 p-6">
+            <p className="text-red-300">Could not load announcements: {newsError}</p>
+          </section>
+        ) : !featuredAnnouncement ? (
+          <section className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950">
+            <div className="relative h-[340px]">
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-60"
+                style={{ backgroundImage: `url("${DEFAULT_NEWS_PLACEHOLDER}")` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/50" />
+              <div className="relative z-10 flex h-full flex-col justify-end p-6">
+                <p className="text-xs uppercase tracking-[0.25em] text-[#FFC72C]">Latest Announcement</p>
+                <h3 className="mt-2 text-2xl font-bold md:text-3xl">No announcements posted yet</h3>
+                <p className="mt-3 max-w-2xl text-sm text-neutral-300 md:text-base">
+                  The coaching staff has not published announcements yet. Check back soon for team news.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="overflow-hidden rounded-2xl border border-[#FFC72C]/30 bg-neutral-950 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+              <div className="relative min-h-[420px]">
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: `url("${resolveAnnouncementImage(
+                      featuredAnnouncement.image_url,
+                      apiUrl,
+                    )}")`,
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/60" />
+                <div className="relative z-10 flex min-h-[420px] flex-col justify-end p-6 md:p-10">
+                  <p className="text-xs uppercase tracking-[0.25em] text-[#FFC72C]">Latest Announcement</p>
+                  <h3 className="mt-2 max-w-3xl text-3xl font-bold leading-tight md:text-4xl">
+                    {featuredAnnouncement.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-neutral-300">
+                    Posted {formatPostedDate(featuredAnnouncement.created_at)}
+                  </p>
+                  <p className="mt-5 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-neutral-100 md:text-base">
+                    {featuredAnnouncement.body}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-8">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-2xl font-semibold">Archive</h3>
+                <span className="text-sm text-neutral-400">{archiveAnnouncements.length} past posts</span>
+              </div>
+
+              {archiveAnnouncements.length === 0 ? (
+                <p className="mt-4 text-sm text-neutral-400">
+                  No archived posts yet. New announcements will appear here after the latest post.
+                </p>
+              ) : (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {archiveAnnouncements.map((item) => (
+                    <article
+                      key={item.id}
+                      className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950"
+                    >
+                      <div className="h-44 w-full bg-black">
+                        <img
+                          src={resolveAnnouncementImage(item.image_url, apiUrl)}
+                          alt={item.title}
+                          className="h-full w-full object-cover opacity-85"
+                        />
+                      </div>
+                      <div className="p-4">
+                        <p className="text-xs uppercase tracking-wide text-[#FFC72C]">
+                          {formatPostedDate(item.created_at)}
+                        </p>
+                        <h4 className="mt-2 text-xl font-semibold">{item.title}</h4>
+                        <p className="mt-2 text-sm text-neutral-300">{bodyPreview(item.body)}</p>
+                        <details className="mt-3 text-sm text-neutral-200">
+                          <summary className="cursor-pointer text-neutral-300">
+                            Read full announcement
+                          </summary>
+                          <p className="mt-2 whitespace-pre-line text-neutral-300">{item.body}</p>
+                        </details>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </main>
     </div>
   );
 }

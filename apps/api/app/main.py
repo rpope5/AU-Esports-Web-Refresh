@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from app.core import config  # noqa: F401
@@ -12,6 +14,7 @@ from app.v1.endpoints import recruits_public
 from app.v1.endpoints import auth_internal
 from app.v1.endpoints import admin_test
 from app.v1.endpoints import recruits_admin
+from app.v1.endpoints import announcements
 from app.auth.routes import router as auth_router
 
 # Load environment variables
@@ -24,6 +27,7 @@ app.include_router(recruits_public.router, prefix="/api/v1")
 app.include_router(auth_internal.router, prefix="/api/v1")
 app.include_router(admin_test.router, prefix="/api/v1")
 app.include_router(recruits_admin.router, prefix="/api/v1")
+app.include_router(announcements.router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
 # Database
@@ -46,6 +50,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Local uploads (announcement backgrounds, etc.)
+uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 # Debug routes
 @app.get("/debug/env")
