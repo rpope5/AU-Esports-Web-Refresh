@@ -49,21 +49,9 @@ def debug_env():
         "secret_exists": os.getenv("AZURE_CLIENT_SECRET") is not None
     }
 
-@app.get("/debug/token")
-async def debug_token():
-    from app.auth.graph import get_graph_token
-    return await get_graph_token()
 
-@app.get("/debug/calendar")
-async def debug_calendar():
-    from app.auth.graph import get_calendar_events
-    
 
-    try:
-        events = await get_calendar_events()
-        return events
-    except Exception as e:
-        return {"error": str(e)}
+
 
 @app.get("/health")
 def health():

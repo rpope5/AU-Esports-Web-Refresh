@@ -4,6 +4,17 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { link } from "fs";
 
+import Calendar from "@/components/Calendar"
+
+export function CalendarPage() {
+  return (
+    <main className="max-w-5xl mx-auto py-10">
+      <h1 className="text-3xl font-bold mb-6">Esports Schedule</h1>
+      <Calendar />
+    </main>
+  )
+}
+
 export default function Home() {
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
 

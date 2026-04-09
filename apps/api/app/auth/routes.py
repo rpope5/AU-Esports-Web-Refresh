@@ -25,6 +25,24 @@ def request_consent():
     return RedirectResponse(url)
 
 
+@router.get("/debug/token")
+async def debug_token():
+    from app.auth.graph import get_graph_token
+    return await get_graph_token()
+
+
+@router.get("/debug/calendar")
+async def debug_calendar():
+    from app.auth.graph import get_calendar_events
+    
+
+    try:
+        events = await get_calendar_events()
+        return events
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.get("/debug/group")
 async def debug_group():
     group_id = os.getenv("AZURE_GROUP_ID")
@@ -44,7 +62,7 @@ async def debug_group():
 
 @router.get("/calendar/{group_id}")
 async def calendar(group_id: str):
-    return await get_calendar_events(group_id)
+    return await get_calendar_events()
 
 @router.get("/auth/consent-complete")
 def consent_complete(admin_consent: str = None, tenant: str = None, state: str = None):
