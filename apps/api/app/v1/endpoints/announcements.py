@@ -83,6 +83,32 @@ def _save_uploaded_image(upload: UploadFile) -> str:
     return f"/uploads/news/{filename}"
 
 
+def _delete_uploaded_image(image_path: str | None) -> bool:
+    if not image_path:
+        return False
+
+    normalized = image_path.strip()
+    if not normalized.startswith("/uploads/news/"):
+        return False
+
+    news_dir_resolved = NEWS_UPLOAD_DIR.resolve()
+    candidate = (API_ROOT / normalized.lstrip("/")).resolve()
+
+    try:
+        candidate.relative_to(news_dir_resolved)
+    except ValueError:
+        return False
+
+    if not candidate.exists() or not candidate.is_file():
+        return False
+
+    try:
+        candidate.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def _serialize_public(item: EsportsAnnouncement) -> AnnouncementPublicOut:
     return AnnouncementPublicOut(
         id=item.id,
@@ -235,3 +261,29 @@ def get_announcement_public(
     if not item:
         raise HTTPException(status_code=404, detail="Announcement not found")
     return _serialize_public(item)
+
+
+@router.delete("/admin/news/{announcement_id}")
+def delete_announcement_admin(
+    announcement_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    item = (
+        db.query(EsportsAnnouncement)
+        .filter(EsportsAnnouncement.id == announcement_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+
+    image_path = item.image_path
+    db.delete(item)
+    db.commit()
+
+    image_deleted = _delete_uploaded_image(image_path)
+    return {
+        "message": "Announcement deleted",
+        "id": announcement_id,
+        "image_deleted": image_deleted,
+    }

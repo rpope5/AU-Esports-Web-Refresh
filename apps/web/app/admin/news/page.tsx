@@ -53,6 +53,8 @@ export default function AdminNewsPage() {
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -180,12 +182,59 @@ export default function AdminNewsPage() {
       setTitle("");
       setBody("");
       setImageFile(null);
+      setPendingDeleteId(null);
       setSuccess("Announcement posted.");
       await loadAnnouncements(token);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create announcement");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function confirmDeleteAnnouncement(announcementId: number) {
+    const token = localStorage.getItem("au_admin_token");
+    if (!token) {
+      router.push("/admin/login");
+      return;
+    }
+
+    setDeletingId(announcementId);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/admin/news/${announcementId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem("au_admin_token");
+        localStorage.removeItem("au_admin_role");
+        localStorage.removeItem("au_admin_username");
+        router.push("/admin/login");
+        return;
+      }
+
+      if (res.status === 404) {
+        setAnnouncements((prev) => prev.filter((item) => item.id !== announcementId));
+        setPendingDeleteId(null);
+        setSuccess("Announcement was already removed.");
+        return;
+      }
+
+      if (!res.ok) {
+        const responseText = await res.text();
+        throw new Error(responseText || "Failed to delete announcement");
+      }
+
+      setAnnouncements((prev) => prev.filter((item) => item.id !== announcementId));
+      setPendingDeleteId(null);
+      setSuccess("Announcement deleted.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to delete announcement");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -291,10 +340,20 @@ export default function AdminNewsPage() {
                   </div>
                   <div className="p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-lg font-semibold">{item.title}</h3>
-                      <span className="text-xs text-neutral-400">
-                        Posted {formatPostedDate(item.created_at)}
-                      </span>
+                      <div>
+                        <h3 className="text-lg font-semibold">{item.title}</h3>
+                        <span className="text-xs text-neutral-400">
+                          Posted {formatPostedDate(item.created_at)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteId(item.id)}
+                        disabled={deletingId === item.id}
+                        className="rounded-md border border-red-700 px-3 py-1 text-xs font-medium text-red-300 transition hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Delete
+                      </button>
                     </div>
                     <p className="mt-2 text-sm text-neutral-300">{previewBody(item.body)}</p>
                     <details className="mt-2 text-sm text-neutral-200">
@@ -303,6 +362,33 @@ export default function AdminNewsPage() {
                       </summary>
                       <p className="mt-2 whitespace-pre-wrap text-neutral-300">{item.body}</p>
                     </details>
+
+                    {pendingDeleteId === item.id && (
+                      <div className="mt-3 rounded-lg border border-red-900 bg-red-950/40 p-3">
+                        <p className="text-sm text-red-200">
+                          This announcement is about to be permanently deleted.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPendingDeleteId(null)}
+                            disabled={deletingId === item.id}
+                            className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-200 transition hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void confirmDeleteAnnouncement(item.id)}
+                            disabled={deletingId === item.id}
+                            className="rounded-md border border-red-700 bg-red-900/50 px-3 py-1 text-xs font-semibold text-red-100 transition hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingId === item.id ? "Deleting..." : "Delete Permanently"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-neutral-400">
                       <span className="rounded-full border border-neutral-700 px-2 py-0.5">
                         ID: {item.id}
