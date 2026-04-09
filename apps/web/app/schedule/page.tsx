@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { link } from "fs";
 
 export default function Home() {
-  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
+  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
 
   const pageMap: { [key: string]: string } = {
     "Home": "/",
@@ -15,7 +15,8 @@ export default function Home() {
     "Stream": "/stream",
     "Recruitment": "/recruit",
     "Facility": "/facility",
-    "Support": "/support"
+    "Support": "/support",
+    "Hall of Fame": "/hof"
   };
 
   const conferences = [

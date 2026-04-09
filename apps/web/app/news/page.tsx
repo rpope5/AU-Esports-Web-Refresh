@@ -50,7 +50,7 @@ function bodyPreview(body: string, maxLength = 220): string {
 
 export default function NewsPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
+  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
   const pageMap: Record<string, string> = {
     Home: "/",
     Roster: "/roster",
@@ -60,6 +60,7 @@ export default function NewsPage() {
     Recruitment: "/recruit",
     Facility: "/facility",
     Support: "/support",
+    "Hall of Fame": "/hof",
   };
 
   const [matches, setMatches] = useState<Match[]>([]);

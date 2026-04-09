@@ -74,6 +74,7 @@ const pages = [
   "Recruitment",
   "Facility",
   "Support",
+  "Hall of Fame",
 ];
 
 const pageMap: Record<string, string> = {
@@ -85,6 +86,7 @@ const pageMap: Record<string, string> = {
   Recruitment: "/recruit",
   Facility: "/facility",
   Support: "/support",
+  "Hall of Fame": "/hof",
 };
 
 const valorantRoles = [

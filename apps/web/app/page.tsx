@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from "next/link";
 
 export default function Home() {
-  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support"];
+  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
   const pageMap: Record<string, string> = {
     Home: '/',
     Roster: '/roster',
@@ -14,6 +14,7 @@ export default function Home() {
     Recruitment: '/recruit',
     Facility: '/facility',
     Support: '/support',
+    "Hall of Fame": '/hof',
   };
 
   const conferences = ["ECAC","GLEC","NECC","CKL","PlayVS","CCL"];

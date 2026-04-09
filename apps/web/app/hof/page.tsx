@@ -2,8 +2,6 @@
 import { useState, useEffect } from "react";
 import Image from 'next/image'
 import Link from 'next/link'
-import { Player } from "@/types/Player";
-import RosterGrid from "@/components/RosterGrid";
 
 export default function Home() {
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
@@ -44,73 +42,64 @@ export default function Home() {
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   const [matches, setMatches] = useState<any[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
 
 useEffect(() => {
-  fetch("http://localhost:8000/api/v1/roster")
-    .then((res) => res.json())
-    .then((data) => setPlayers(data))
-    .catch(() => console.error("Failed to load roster"));
+  const tryLoad = async () => {
+    try {
+      const resX = await fetch('/data/matches.xlsx');
+      if (resX.ok) {
+        const buffer = await resX.arrayBuffer();
+        const XLSX = await import('xlsx' as any).catch(() => null);
+        if (!XLSX) throw new Error('xlsx not available');
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (Array.isArray(raw) && raw.length) {
+          const parsed = raw.map((r: any, i: number) => ({
+            id: r.id ?? i + 1,
+            ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
+            opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
+            game: r.game ?? r.Game ?? r.Platform ?? '',
+            time: r.time ?? r.Time ?? r.datetime ?? ''
+          }));
+          setMatches(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const resC = await fetch('/data/matches.csv');
+      if (resC.ok) {
+        const txt = await resC.text();
+        const rows = txt.trim().split('\n').map((r) => r.split(','));
+        const headers = rows.shift() || [];
+        const parsed = rows.map((cols, i) => {
+          const obj: any = {};
+          headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
+          return {
+            id: Number(obj.id) || i + 1,
+            ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
+            opponent: obj.opponent || obj.Opponent || '',
+            game: obj.game || obj.Game || '',
+            time: obj.time || obj.Time || ''
+          };
+        });
+        if (parsed.length) { setMatches(parsed); return; }
+      }
+    } catch (e) {}
+
+    try {
+      const r = await fetch('/data/matches.json');
+      if (!r.ok) throw new Error('failed');
+      const data = await r.json();
+      if (Array.isArray(data) && data.length) setMatches(data);
+    } catch (e) {}
+  };
+
+  tryLoad();
 }, []);
-
-// Load matches
-  useEffect(() => {
-    const tryLoad = async () => {
-      try {
-        const resX = await fetch('/data/matches.xlsx');
-        if (resX.ok) {
-          const buffer = await resX.arrayBuffer();
-          const XLSX = await import('xlsx' as any).catch(() => null);
-          if (!XLSX) throw new Error('xlsx not available');
-          const wb = XLSX.read(buffer, { type: 'array' });
-          const sheetName = wb.SheetNames[0];
-          const ws = wb.Sheets[sheetName];
-          const raw = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          if (Array.isArray(raw) && raw.length) {
-            const parsed = raw.map((r: any, i: number) => ({
-              id: r.id ?? i + 1,
-              ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? 'Ashland',
-              opponent: r.opponent ?? r.Opponent ?? r.Opp ?? '',
-              game: r.game ?? r.Game ?? r.Platform ?? '',
-              time: r.time ?? r.Time ?? r.datetime ?? ''
-            }));
-            setMatches(parsed);
-            return;
-          }
-        }
-      } catch (e) {}
-
-      try {
-        const resC = await fetch('/data/matches.csv');
-        if (resC.ok) {
-          const txt = await resC.text();
-          const rows = txt.trim().split('\n').map((r) => r.split(','));
-          const headers = rows.shift() || [];
-          const parsed = rows.map((cols, i) => {
-            const obj: any = {};
-            headers.forEach((h, idx) => { obj[h.trim()] = cols[idx] ? cols[idx].trim() : ''; });
-            return {
-              id: Number(obj.id) || i + 1,
-              ourTeam: obj.ourTeam || obj.OurTeam || 'Ashland',
-              opponent: obj.opponent || obj.Opponent || '',
-              game: obj.game || obj.Game || '',
-              time: obj.time || obj.Time || ''
-            };
-          });
-          if (parsed.length) { setMatches(parsed); return; }
-        }
-      } catch (e) {}
-
-      try {
-        const r = await fetch('/data/matches.json');
-        if (!r.ok) throw new Error('failed');
-        const data = await r.json();
-        if (Array.isArray(data) && data.length) setMatches(data);
-      } catch (e) {}
-    };
-
-    tryLoad();
-  }, []);
 
   const [matchStart, setMatchStart] = useState(0);
   const matchesToShow = 5;
@@ -197,7 +186,6 @@ useEffect(() => {
             <h1 className="title title-3d text-lg md:text-2xl font-bold tracking-wide" style={{ textShadow: "1px 1px #333"}}>
               Ashland University Esports
             </h1>
-
             {isLive && (
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -229,8 +217,49 @@ useEffect(() => {
 
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
 
-      <div className="text-4xl py-8 text-center font-Gotham-Bold">Team Roster</div>
-      <RosterGrid players={players} />
+      <main className="px-10 py-10">
+        <h2 className="text-4xl text-center font-bold mb-8">Hall of Fame</h2>
+        <p className="text-center text-lg mb-8">Celebrating our National Championship Teams</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+          <div className="bg-[#FFC72C] p-6 rounded-lg text-center text-black">
+            <h3 className="text-2xl font-bold mb-4">2025 National Champions- PlayVS - Hearthstone</h3>
+            <div className="mb-4">
+              <Image src="/Hearthstone1.jpg" alt="2025 Hearthstone Championship Team" width={300} height={200} className="rounded-lg mb-2 mx-auto" />
+              <p className="text-sm text-gray-700">Championship Team</p>
+            </div>
+            <div className="mb-4">
+              <Image src="/images/valorant-logo.png" alt="Trophy" width={150} height={150} className="rounded-lg mx-auto" />
+            </div>
+            <p className="text-black text-lg font-semibold">Championship Year: 2025</p>
+          </div>
+          
+          <div className="bg-[#5C068C] p-6 rounded-lg text-center text-white">
+            <h3 className="text-2xl font-bold mb-4">2025 National Champions - NECC - Counter Strike 2</h3>
+            <div className="mb-4">
+              <Image src="/CS2.jpg" alt="2025 CS2 Championship Team" width={300} height={200} className="rounded-lg mb-2 mx-auto" />
+              <p className="text-sm text-white-700">Championship Team</p>
+            </div>
+            <div className="mb-4">
+              <Image src="/images/overwatch-logo.png" alt="Trohpy" width={150} height={150} className="rounded-lg mx-auto" />
+            </div>
+            <p className="text-white text-lg font-semibold">Championship Year: 2025</p>
+          </div>
+          
+          <div className="bg-[#FFC72C] p-6 rounded-lg text-center text-black">
+            <h3 className="text-2xl font-bold mb-4">2025 National Champions - ECAC - Hearthstone</h3>
+            <div className="mb-4">
+              <Image src="/Hearthstone2.jpg" alt="2025 Hearthstone Championship Team" width={300} height={200} className="rounded-lg mb-2 mx-auto" />
+              <p className="text-sm text-gray-700">Championship Team</p>
+            </div>
+            <div className="mb-4">
+              <Image src="/images/rocket-league-logo.png" alt="Trohpy" width={150} height={150} className="rounded-lg mx-auto" />
+            </div>
+            <p className="text-black text-lg font-semibold">Championship Year: 2025</p>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
