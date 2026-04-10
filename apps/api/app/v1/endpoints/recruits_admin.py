@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from typing import Any
 
@@ -429,7 +430,61 @@ def get_recruit_detail(
             "reviewer_username": reviewer_username,
         },
     }
-    
+
+
+@router.delete("/admin/recruit/{application_id}")
+def delete_recruit(
+    application_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+):
+    app = (
+        db.query(RecruitApplication)
+        .filter(RecruitApplication.id == application_id)
+        .first()
+    )
+    if not app:
+        raise HTTPException(status_code=404, detail="Recruit not found")
+
+    try:
+        reviews_deleted = (
+            db.query(RecruitReview)
+            .filter(RecruitReview.application_id == application_id)
+            .delete(synchronize_session=False)
+        )
+        rankings_deleted = (
+            db.query(RecruitRanking)
+            .filter(RecruitRanking.application_id == application_id)
+            .delete(synchronize_session=False)
+        )
+        profiles_deleted = (
+            db.query(RecruitGameProfile)
+            .filter(RecruitGameProfile.application_id == application_id)
+            .delete(synchronize_session=False)
+        )
+        availability_deleted = (
+            db.query(RecruitAvailability)
+            .filter(RecruitAvailability.application_id == application_id)
+            .delete(synchronize_session=False)
+        )
+        db.delete(app)
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete recruit") from exc
+
+    return {
+        "message": "Recruit deleted",
+        "application_id": application_id,
+        "deleted_related_rows": {
+            "reviews": reviews_deleted,
+            "rankings": rankings_deleted,
+            "profiles": profiles_deleted,
+            "availability": availability_deleted,
+        },
+    }
+
+
 @router.patch("/admin/recruit/{application_id}/status")
 def update_recruit_status(
     application_id: int,
