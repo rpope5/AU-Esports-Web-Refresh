@@ -42,12 +42,6 @@ function formatPostedDate(rawValue: string): string {
   });
 }
 
-function bodyPreview(body: string, maxLength = 220): string {
-  const normalized = body.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength).trim()}...`;
-}
-
 export default function NewsPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
@@ -71,6 +65,7 @@ export default function NewsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loadingNews, setLoadingNews] = useState(true);
   const [newsError, setNewsError] = useState<string | null>(null);
+  const [expandedAnnouncementIds, setExpandedAnnouncementIds] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     const tryLoadMatches = async () => {
@@ -197,6 +192,12 @@ export default function NewsPage() {
 
   const featuredAnnouncement = useMemo(() => announcements[0] ?? null, [announcements]);
   const archiveAnnouncements = useMemo(() => announcements.slice(1), [announcements]);
+  const toggleArchiveAnnouncement = (announcementId: number) => {
+    setExpandedAnnouncementIds((current) => ({
+      ...current,
+      [announcementId]: !current[announcementId],
+    }));
+  };
 
   const prevMatches = () => setMatchStart((current) => Math.max(0, current - 1));
   const nextMatches = () =>
@@ -351,34 +352,48 @@ export default function NewsPage() {
                   No archived posts yet. New announcements will appear here after the latest post.
                 </p>
               ) : (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  {archiveAnnouncements.map((item) => (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950"
-                    >
-                      <div className="h-44 w-full bg-black">
-                        <img
-                          src={resolveAnnouncementImage(item.image_url, apiUrl)}
-                          alt={item.title}
-                          className="h-full w-full object-cover opacity-85"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <p className="text-xs uppercase tracking-wide text-[#FFC72C]">
-                          {formatPostedDate(item.created_at)}
-                        </p>
-                        <h4 className="mt-2 text-xl font-semibold">{item.title}</h4>
-                        <p className="mt-2 text-sm text-neutral-300">{bodyPreview(item.body)}</p>
-                        <details className="mt-3 text-sm text-neutral-200">
-                          <summary className="cursor-pointer text-neutral-300">
-                            Read full announcement
-                          </summary>
-                          <p className="mt-2 whitespace-pre-line text-neutral-300">{item.body}</p>
-                        </details>
-                      </div>
-                    </article>
-                  ))}
+                <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
+                  {archiveAnnouncements.map((item) => {
+                    const isExpanded = Boolean(expandedAnnouncementIds[item.id]);
+                    const announcementBodyId = `archive-announcement-body-${item.id}`;
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="self-start overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950"
+                      >
+                        <div className="p-4">
+                          <p className="text-xs uppercase tracking-wide text-[#FFC72C]">
+                            {formatPostedDate(item.created_at)}
+                          </p>
+                          <h4 className="mt-2 text-xl font-semibold">{item.title}</h4>
+                          <button
+                            type="button"
+                            className="mt-3 text-sm text-neutral-300 transition-colors hover:text-white"
+                            aria-expanded={isExpanded}
+                            aria-controls={announcementBodyId}
+                            onClick={() => toggleArchiveAnnouncement(item.id)}
+                          >
+                            {isExpanded ? "Hide full announcement" : "Read full announcement"}
+                          </button>
+                          {isExpanded && (
+                            <div id={announcementBodyId} className="mt-4">
+                              <div className="h-44 w-full overflow-hidden rounded-lg bg-black">
+                                <img
+                                  src={resolveAnnouncementImage(item.image_url, apiUrl)}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover opacity-85"
+                                />
+                              </div>
+                              <p className="mt-3 whitespace-pre-line text-sm text-neutral-300">
+                                {item.body}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </section>
