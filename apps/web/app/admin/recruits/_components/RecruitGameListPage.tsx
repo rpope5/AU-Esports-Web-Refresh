@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "./scoreBands";
+import InlineDestructiveConfirm from "../../_components/InlineDestructiveConfirm";
 
 type ScoreComponent = {
   raw?: number;
@@ -100,7 +101,10 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [recruits, setRecruits] = useState<Recruit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [sortBy, setSortBy] = useState<SortOption>("score_desc");
   const [statusFilter, setStatusFilter] = useState<"" | RecruitReviewStatus>("");
@@ -117,7 +121,7 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
 
     (async () => {
       setLoading(true);
-      setErr(null);
+      setLoadErr(null);
       try {
         const params = new URLSearchParams();
         if (statusFilter) params.set("status", statusFilter);
@@ -138,19 +142,65 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         if (!res.ok) {
           const text = await res.text();
           console.error(`Failed to load ${gameSlug} recruits:`, res.status, text);
-          setErr(`Failed to load recruits (${res.status})`);
+          setLoadErr(`Failed to load recruits (${res.status})`);
           return;
         }
 
         const data = (await res.json()) as Recruit[];
         setRecruits(data);
       } catch (e: unknown) {
-        setErr(e instanceof Error ? e.message : "Failed to load recruits");
+        setLoadErr(e instanceof Error ? e.message : "Failed to load recruits");
       } finally {
         setLoading(false);
       }
     })();
   }, [apiUrl, router, gameSlug, statusFilter, minScoreInput]);
+
+  async function deleteRecruit(applicationId: number): Promise<void> {
+    const token = localStorage.getItem("au_admin_token");
+    if (!token) {
+      router.push("/admin/login");
+      throw new Error("Session expired");
+    }
+
+    setDeletingId(applicationId);
+    setActionErr(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${applicationId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem("au_admin_token");
+        localStorage.removeItem("au_admin_role");
+        localStorage.removeItem("au_admin_username");
+        router.push("/admin/login");
+        throw new Error("Unauthorized");
+      }
+
+      if (res.status === 404) {
+        setRecruits((prev) => prev.filter((recruit) => recruit.application_id !== applicationId));
+        setSuccess("Recruit was already removed.");
+        return;
+      }
+
+      if (!res.ok) {
+        const responseText = await res.text();
+        throw new Error(responseText || "Failed to delete recruit");
+      }
+
+      setRecruits((prev) => prev.filter((recruit) => recruit.application_id !== applicationId));
+      setSuccess("Recruit deleted.");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to delete recruit";
+      setActionErr(message);
+      throw new Error(message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const displayedRecruits = useMemo(() => {
     const rows = [...recruits];
@@ -259,10 +309,13 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         </div>
       </div>
 
+      {actionErr && <p className="mt-4 text-sm text-red-400">{actionErr}</p>}
+      {success && <p className="mt-4 text-sm text-emerald-400">{success}</p>}
+
       {loading ? (
         <p className="mt-4 text-neutral-400">Loading...</p>
-      ) : err ? (
-        <p className="mt-4 text-red-400">{err}</p>
+      ) : loadErr ? (
+        <p className="mt-4 text-red-400">{loadErr}</p>
       ) : displayedRecruits.length === 0 ? (
         <p className="mt-4 text-neutral-400">No recruits found for current filters.</p>
       ) : (
@@ -270,47 +323,64 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
           {displayedRecruits.map((r) => {
             const scoreBand = getScoreBand(r.score, gameSlug);
             return (
-              <Link
+              <article
                 key={r.application_id}
-                href={`/admin/recruits/${r.application_id}`}
-                className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:border-neutral-700"
+                className="rounded-xl border border-neutral-800 bg-neutral-950 p-4"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-medium">
-                      {r.first_name} {r.last_name}
-                    </h2>
-                    <p className="text-sm text-neutral-400">
-                      {(r.ign || "N/A")} | {(r.current_rank_label || "N/A")} | {(r.primary_role || "N/A")}
-                      {r.secondary_role ? ` / ${r.secondary_role}` : ""}
-                    </p>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {r.current_school || "Unknown school"} | Class of {r.graduation_year ?? "N/A"}
-                    </p>
-                    <p className="mt-2 text-xs text-neutral-500">{reasonPreview(r.score_components)}</p>
-                  </div>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <Link
+                    href={`/admin/recruits/${r.application_id}`}
+                    className="min-w-0 flex-1 rounded-lg p-1 transition hover:bg-neutral-900/40"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-lg font-medium">
+                          {r.first_name} {r.last_name}
+                        </h2>
+                        <p className="text-sm text-neutral-400">
+                          {(r.ign || "N/A")} | {(r.current_rank_label || "N/A")} | {(r.primary_role || "N/A")}
+                          {r.secondary_role ? ` / ${r.secondary_role}` : ""}
+                        </p>
+                        <p className="mt-1 text-sm text-neutral-500">
+                          {r.current_school || "Unknown school"} | Class of {r.graduation_year ?? "N/A"}
+                        </p>
+                        <p className="mt-2 text-xs text-neutral-500">{reasonPreview(r.score_components)}</p>
+                      </div>
 
-                  <div className="text-right">
-                    <div className="text-sm text-neutral-400">Score</div>
-                    <div className="text-2xl font-semibold">{r.score ?? "--"}</div>
-                    {scoreBand && (
-                      <div
-                        className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${scoreBand.badgeClassName}`}
-                      >
-                        {scoreBand.label}
+                      <div className="text-right">
+                        <div className="text-sm text-neutral-400">Score</div>
+                        <div className="text-2xl font-semibold">{r.score ?? "--"}</div>
+                        {scoreBand && (
+                          <div
+                            className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${scoreBand.badgeClassName}`}
+                          >
+                            {scoreBand.label}
+                          </div>
+                        )}
+                        <div className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{r.status}</div>
+                        <div className="mt-1 text-xs text-neutral-500">Labeled: {formatTimestampShort(r.review_labeled_at)}</div>
+                        <div className="mt-1 text-xs text-neutral-500">By: {r.reviewer_username || "N/A"}</div>
+                        {r.score_model_version && (
+                          <div className="mt-1 text-xs text-neutral-600">
+                            {r.score_scoring_method || "rules"} | {r.score_model_version}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div className="mt-1 text-xs uppercase tracking-wide text-neutral-500">{r.status}</div>
-                    <div className="mt-1 text-xs text-neutral-500">Labeled: {formatTimestampShort(r.review_labeled_at)}</div>
-                    <div className="mt-1 text-xs text-neutral-500">By: {r.reviewer_username || "N/A"}</div>
-                    {r.score_model_version && (
-                      <div className="mt-1 text-xs text-neutral-600">
-                        {r.score_scoring_method || "rules"} | {r.score_model_version}
-                      </div>
-                    )}
+                    </div>
+                  </Link>
+
+                  <div className="w-full sm:w-auto">
+                    <InlineDestructiveConfirm
+                      triggerLabel="Delete"
+                      confirmMessage="This recruit submission is about to be permanently deleted."
+                      confirmLabel="Delete Permanently"
+                      pendingLabel="Deleting..."
+                      busy={deletingId === r.application_id}
+                      onConfirm={() => deleteRecruit(r.application_id)}
+                    />
                   </div>
                 </div>
-              </Link>
+              </article>
             );
           })}
         </div>

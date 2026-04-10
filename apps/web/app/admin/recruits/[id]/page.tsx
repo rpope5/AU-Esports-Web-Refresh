@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "../_components/scoreBands";
 
@@ -167,6 +168,8 @@ export default function RecruitDetailPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [data, setData] = useState<RecruitDetailResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState<RecruitReviewStatus>("NEW");
   const [labelReason, setLabelReason] = useState("");
   const [notes, setNotes] = useState("");
@@ -180,20 +183,44 @@ export default function RecruitDetailPage() {
     }
 
     (async () => {
-      const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      if (!res.ok) {
-        router.push("/admin/login");
-        return;
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("au_admin_token");
+          localStorage.removeItem("au_admin_role");
+          localStorage.removeItem("au_admin_username");
+          router.push("/admin/login");
+          return;
+        }
+
+        if (res.status === 404) {
+          setData(null);
+          setLoadError("Recruit not found. It may have been deleted.");
+          return;
+        }
+
+        if (!res.ok) {
+          setData(null);
+          setLoadError(`Failed to load recruit (${res.status}).`);
+          return;
+        }
+
+        const result = await res.json();
+        setData(result);
+        setStatus((result.review?.status as RecruitReviewStatus) || "NEW");
+        setLabelReason(result.review?.label_reason || "");
+        setNotes(result.review?.notes || "");
+      } catch {
+        setData(null);
+        setLoadError("Failed to load recruit.");
+      } finally {
+        setLoading(false);
       }
-
-      const result = await res.json();
-      setData(result);
-      setStatus((result.review?.status as RecruitReviewStatus) || "NEW");
-      setLabelReason(result.review?.label_reason || "");
-      setNotes(result.review?.notes || "");
     })();
   }, [apiUrl, params.id, router]);
 
@@ -295,8 +322,23 @@ export default function RecruitDetailPage() {
     !!data?.profiles?.[0]?.best_wins ||
     !!data?.profiles?.[0]?.characters;
 
-  if (!data) {
+  if (loading) {
     return <div className="p-6 text-neutral-400">Loading...</div>;
+  }
+
+  if (!data) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold">Recruit Detail</h1>
+        <p className="mt-2 text-sm text-red-400">{loadError || "Recruit not found."}</p>
+        <Link
+          href="/admin"
+          className="mt-4 inline-flex rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 transition hover:bg-neutral-800"
+        >
+          Back to Admin
+        </Link>
+      </div>
+    );
   }
 
   const app = data.application;
@@ -315,8 +357,8 @@ export default function RecruitDetailPage() {
         <h1 className="text-2xl font-semibold">
           {app.first_name} {app.last_name}
         </h1>
-        <p className="text-neutral-400">{app.email}</p>
-        <p className="text-neutral-400">{app.discord}</p>
+        <p className="text-neutral-400">Email: {app.email}</p>
+        <p className="text-neutral-400">Discord: {app.discord}</p>
         <p className="text-sm text-neutral-500">Submitted: {formatTimestampLocal(app.created_at)}</p>
       </div>
 

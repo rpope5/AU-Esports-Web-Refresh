@@ -104,7 +104,6 @@ const cs2Roles = [
   "IGL",
   "Lurker",
   "Support",
-  "Flex",
 ];
 
 const fortniteRoles = [
