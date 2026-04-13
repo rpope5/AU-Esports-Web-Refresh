@@ -223,7 +223,7 @@ export default function Home() {
         you can help us grow our program, support our players, and compete at the highest level.
       </p>
       <Link
-  href="https://www.givecampus.com/schools/AshlandUniversity/2026-choose-ashland-day-of-giving"
+  href="https://www.givecampus.com/campaigns/8374/donations/new?designation=esports&"
   target="_blank"
 >
   <button className="mt-4 bg-[#FFC72C] text-black font-semibold px-6 py-3 rounded-full shadow-lg hover:bg-yellow-400 transition">

@@ -1509,7 +1509,7 @@ const [isLive, setIsLive] = useState(false);
                 
 
                 <Input
-                  label="Tracker / Profile URL"
+                  label="Tracker / Profile URL (Optional)"
                   value={form.tracker_url}
                   onChange={(v) => update("tracker_url", v)}
                 />
