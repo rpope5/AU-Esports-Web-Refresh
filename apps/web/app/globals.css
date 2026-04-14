@@ -223,3 +223,12 @@ body {
   display: none;
 }
 
+/* Glowing outline for images */
+.glow-outline {
+  box-shadow: 0 0 10px #FFC72C, 0 0 20px #FFC72C;
+}
+
+.glow-outline-purple {
+  box-shadow: 0 0 10px #5C068C, 0 0 20px #5C068C;
+}
+
