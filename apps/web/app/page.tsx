@@ -322,7 +322,7 @@ export default function Home() {
                 href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
                 className="shop-btn-alt"
               >
-                <img src="/infinite.png" className="w-40" />
+                <img src="/jersey.png" className="w-40" />
               </a>
             </div>
           </div>
