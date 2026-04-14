@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "./scoreBands";
 import InlineDestructiveConfirm from "../../_components/InlineDestructiveConfirm";
+import {
+  canAccessGame,
+  clearAdminStorage,
+  formatRoleLabel,
+  parseAdminSession,
+  type AdminSession,
+} from "../../_lib/session";
 
 type ScoreComponent = {
   raw?: number;
@@ -99,6 +107,8 @@ function reasonPreview(components?: Record<string, ScoreComponent> | null): stri
 export default function RecruitGameListPage({ gameSlug, title, description }: Props) {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const [session, setSession] = useState<AdminSession | null>(null);
   const [recruits, setRecruits] = useState<Recruit[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -111,6 +121,7 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
   const [minScoreInput, setMinScoreInput] = useState("");
   const triageLegend = useMemo(() => getScoreBandLegend(gameSlug), [gameSlug]);
   const isSmashPolicy = usesSmashScoreBands(gameSlug);
+  const canDeleteRecruits = Boolean(session?.permissions.can_delete_recruits);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -123,6 +134,32 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
       setLoading(true);
       setLoadErr(null);
       try {
+        const whoamiRes = await fetch(`${apiUrl}/api/v1/admin/whoami`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (whoamiRes.status === 401) {
+          clearAdminStorage();
+          router.push("/admin/login");
+          return;
+        }
+        if (!whoamiRes.ok) {
+          setLoadErr("Failed to validate admin session.");
+          return;
+        }
+
+        const parsedSession = parseAdminSession(await whoamiRes.json());
+        setSession(parsedSession);
+
+        if (!parsedSession.permissions.can_view_recruits) {
+          setLoadErr("You do not have permission to view recruits.");
+          return;
+        }
+        if (!canAccessGame(parsedSession, gameSlug)) {
+          setLoadErr("You are not assigned to this game.");
+          return;
+        }
+
         const params = new URLSearchParams();
         if (statusFilter) params.set("status", statusFilter);
         if (minScoreInput.trim()) params.set("min_score", minScoreInput.trim());
@@ -133,12 +170,15 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("au_admin_token");
+        if (res.status === 401) {
+          clearAdminStorage();
           router.push("/admin/login");
           return;
         }
-
+        if (res.status === 403) {
+          setLoadErr("You are not authorized to access this game's recruits.");
+          return;
+        }
         if (!res.ok) {
           const text = await res.text();
           console.error(`Failed to load ${gameSlug} recruits:`, res.status, text);
@@ -148,8 +188,8 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
 
         const data = (await res.json()) as Recruit[];
         setRecruits(data);
-      } catch (e: unknown) {
-        setLoadErr(e instanceof Error ? e.message : "Failed to load recruits");
+      } catch (err: unknown) {
+        setLoadErr(err instanceof Error ? err.message : "Failed to load recruits");
       } finally {
         setLoading(false);
       }
@@ -157,6 +197,10 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
   }, [apiUrl, router, gameSlug, statusFilter, minScoreInput]);
 
   async function deleteRecruit(applicationId: number): Promise<void> {
+    if (!canDeleteRecruits) {
+      throw new Error("You do not have permission to delete recruits.");
+    }
+
     const token = localStorage.getItem("au_admin_token");
     if (!token) {
       router.push("/admin/login");
@@ -172,12 +216,13 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem("au_admin_token");
-        localStorage.removeItem("au_admin_role");
-        localStorage.removeItem("au_admin_username");
+      if (res.status === 401) {
+        clearAdminStorage();
         router.push("/admin/login");
         throw new Error("Unauthorized");
+      }
+      if (res.status === 403) {
+        throw new Error("You do not have permission to delete recruits.");
       }
 
       if (res.status === 404) {
@@ -193,8 +238,8 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
 
       setRecruits((prev) => prev.filter((recruit) => recruit.application_id !== applicationId));
       setSuccess("Recruit deleted.");
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to delete recruit";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete recruit";
       setActionErr(message);
       throw new Error(message);
     } finally {
@@ -230,6 +275,11 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="mt-1 text-sm text-neutral-400">{description}</p>
+          {session && (
+            <p className="mt-1 text-xs text-neutral-500">
+              Signed in as {session.username} - {formatRoleLabel(session.role)}
+            </p>
+          )}
         </div>
 
         <Link
@@ -369,16 +419,18 @@ export default function RecruitGameListPage({ gameSlug, title, description }: Pr
                     </div>
                   </Link>
 
-                  <div className="w-full sm:w-auto">
-                    <InlineDestructiveConfirm
-                      triggerLabel="Delete"
-                      confirmMessage="This recruit submission is about to be permanently deleted."
-                      confirmLabel="Delete Permanently"
-                      pendingLabel="Deleting..."
-                      busy={deletingId === r.application_id}
-                      onConfirm={() => deleteRecruit(r.application_id)}
-                    />
-                  </div>
+                  {canDeleteRecruits && (
+                    <div className="w-full sm:w-auto">
+                      <InlineDestructiveConfirm
+                        triggerLabel="Delete"
+                        confirmMessage="This recruit submission is about to be permanently deleted."
+                        confirmLabel="Delete Permanently"
+                        pendingLabel="Deleting..."
+                        busy={deletingId === r.application_id}
+                        onConfirm={() => deleteRecruit(r.application_id)}
+                      />
+                    </div>
+                  )}
                 </div>
               </article>
             );

@@ -11,6 +11,7 @@ from .recruit import (
     RecruitReview,
 )
 from .roster import Player
+from .staff_game_access import StaffGameAccess
 
 # Optional but nice: define __all__
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "RecruitRanking",
     "RecruitReview",
     "Player",
+    "StaffGameAccess",
 ]

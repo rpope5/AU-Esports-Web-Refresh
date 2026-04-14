@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
+import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
 
 type Announcement = {
   id: number;
@@ -47,7 +49,7 @@ export default function AdminNewsPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  const [me, setMe] = useState<{ username: string; role: string } | null>(null);
+  const [me, setMe] = useState<AdminSession | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
   const [title, setTitle] = useState("");
@@ -68,6 +70,9 @@ export default function AdminNewsPage() {
     [announcements],
   );
 
+  const canManageAnnouncements = Boolean(me?.permissions.can_manage_announcements);
+  const canDeleteAnnouncements = Boolean(me?.permissions.can_delete_announcements);
+
   const loadAnnouncements = useCallback(
     async (token: string) => {
       setLoadingAnnouncements(true);
@@ -76,14 +81,15 @@ export default function AdminNewsPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("au_admin_token");
-          localStorage.removeItem("au_admin_role");
-          localStorage.removeItem("au_admin_username");
+        if (res.status === 401) {
+          clearAdminStorage();
           router.push("/admin/login");
           return;
         }
-
+        if (res.status === 403) {
+          setError("You do not have permission to manage announcements.");
+          return;
+        }
         if (!res.ok) {
           const responseText = await res.text();
           throw new Error(responseText || "Failed to load announcements");
@@ -91,8 +97,8 @@ export default function AdminNewsPage() {
 
         const data = (await res.json()) as Announcement[];
         setAnnouncements(data);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load announcements");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load announcements");
       } finally {
         setLoadingAnnouncements(false);
       }
@@ -112,21 +118,31 @@ export default function AdminNewsPage() {
         const whoamiRes = await fetch(`${apiUrl}/api/v1/admin/whoami`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!whoamiRes.ok) {
-          localStorage.removeItem("au_admin_token");
-          localStorage.removeItem("au_admin_role");
-          localStorage.removeItem("au_admin_username");
+
+        if (whoamiRes.status === 401) {
+          clearAdminStorage();
           router.push("/admin/login");
           return;
         }
-        const whoami = await whoamiRes.json();
-        setMe(whoami);
+        if (!whoamiRes.ok) {
+          setError("Failed to validate admin session.");
+          setLoadingAnnouncements(false);
+          return;
+        }
+
+        const parsedSession = parseAdminSession(await whoamiRes.json());
+        setMe(parsedSession);
+
+        if (!parsedSession.permissions.can_manage_announcements) {
+          setError("You do not have permission to manage announcements.");
+          setLoadingAnnouncements(false);
+          return;
+        }
+
         await loadAnnouncements(token);
       } catch {
-        localStorage.removeItem("au_admin_token");
-        localStorage.removeItem("au_admin_role");
-        localStorage.removeItem("au_admin_username");
-        router.push("/admin/login");
+        setError("Failed to initialize announcements.");
+        setLoadingAnnouncements(false);
       }
     };
 
@@ -150,6 +166,10 @@ export default function AdminNewsPage() {
       router.push("/admin/login");
       return;
     }
+    if (!canManageAnnouncements) {
+      setError("You do not have permission to create announcements.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -166,14 +186,15 @@ export default function AdminNewsPage() {
         body: formData,
       });
 
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem("au_admin_token");
-        localStorage.removeItem("au_admin_role");
-        localStorage.removeItem("au_admin_username");
+      if (res.status === 401) {
+        clearAdminStorage();
         router.push("/admin/login");
         return;
       }
-
+      if (res.status === 403) {
+        setError("You do not have permission to create announcements.");
+        return;
+      }
       if (!res.ok) {
         const responseText = await res.text();
         throw new Error(responseText || "Failed to create announcement");
@@ -184,14 +205,18 @@ export default function AdminNewsPage() {
       setImageFile(null);
       setSuccess("Announcement posted.");
       await loadAnnouncements(token);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create announcement");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create announcement");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function confirmDeleteAnnouncement(announcementId: number): Promise<void> {
+    if (!canDeleteAnnouncements) {
+      throw new Error("You do not have permission to delete announcements.");
+    }
+
     const token = localStorage.getItem("au_admin_token");
     if (!token) {
       router.push("/admin/login");
@@ -207,20 +232,19 @@ export default function AdminNewsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem("au_admin_token");
-        localStorage.removeItem("au_admin_role");
-        localStorage.removeItem("au_admin_username");
+      if (res.status === 401) {
+        clearAdminStorage();
         router.push("/admin/login");
         throw new Error("Unauthorized");
       }
-
+      if (res.status === 403) {
+        throw new Error("You do not have permission to delete announcements.");
+      }
       if (res.status === 404) {
         setAnnouncements((prev) => prev.filter((item) => item.id !== announcementId));
         setSuccess("Announcement was already removed.");
         return;
       }
-
       if (!res.ok) {
         const responseText = await res.text();
         throw new Error(responseText || "Failed to delete announcement");
@@ -228,8 +252,8 @@ export default function AdminNewsPage() {
 
       setAnnouncements((prev) => prev.filter((item) => item.id !== announcementId));
       setSuccess("Announcement deleted.");
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to delete announcement";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete announcement";
       setError(message);
       throw new Error(message);
     } finally {
@@ -243,7 +267,7 @@ export default function AdminNewsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Esports Announcements</h1>
           <p className="mt-1 text-sm text-neutral-400">
-            {me ? `Signed in as ${me.username} - ${me.role}` : "Loading session..."}
+            {me ? `Signed in as ${me.username} - ${formatRoleLabel(me.role)}` : "Loading session..."}
           </p>
         </div>
         <Link
@@ -254,61 +278,71 @@ export default function AdminNewsPage() {
         </Link>
       </div>
 
-      <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
-        <h2 className="text-xl font-medium">Create Announcement</h2>
-        <p className="mt-1 text-sm text-neutral-400">
-          Publish latest team news for the public `/news` page.
-        </p>
+      {canManageAnnouncements ? (
+        <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+          <h2 className="text-xl font-medium">Create Announcement</h2>
+          <p className="mt-1 text-sm text-neutral-400">
+            Publish latest team news for the public `/news` page.
+          </p>
 
-        <form className="mt-4 grid gap-4" onSubmit={submitAnnouncement}>
-          <div>
-            <label className="text-sm text-neutral-300">Subject / Title</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Example: Valorant Team Wins Spring Invitational"
-              maxLength={255}
-              required
-            />
-          </div>
+          <form className="mt-4 grid gap-4" onSubmit={submitAnnouncement}>
+            <div>
+              <label className="text-sm text-neutral-300">Subject / Title</label>
+              <input
+                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Example: Valorant Team Wins Spring Invitational"
+                maxLength={255}
+                required
+              />
+            </div>
 
-          <div>
-            <label className="text-sm text-neutral-300">Announcement Content</label>
-            <textarea
-              className="mt-1 min-h-40 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-sm"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Write the full announcement here..."
-              required
-            />
-          </div>
+            <div>
+              <label className="text-sm text-neutral-300">Announcement Content</label>
+              <textarea
+                className="mt-1 min-h-40 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-sm"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Write the full announcement here..."
+                required
+              />
+            </div>
 
-          <div>
-            <label className="text-sm text-neutral-300">Background Image (Optional)</label>
-            <input
-              className="mt-1 block w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-sm"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-            />
-            <p className="mt-1 text-xs text-neutral-500">
-              If omitted, the frontend uses `/images/esports-news-placeholder.jpg`.
-            </p>
-          </div>
+            <div>
+              <label className="text-sm text-neutral-300">Background Image (Optional)</label>
+              <input
+                className="mt-1 block w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-sm"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              />
+              <p className="mt-1 text-xs text-neutral-500">
+                If omitted, the frontend uses `/images/esports-news-placeholder.jpg`.
+              </p>
+            </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
-          >
-            {submitting ? "Posting..." : "Post Announcement"}
-          </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
+            >
+              {submitting ? "Posting..." : "Post Announcement"}
+            </button>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {success && <p className="text-sm text-emerald-400">{success}</p>}
-        </form>
-      </section>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            {success && <p className="text-sm text-emerald-400">{success}</p>}
+          </form>
+        </section>
+      ) : (
+        <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+          <h2 className="text-xl font-medium">Announcement Access</h2>
+          <p className="mt-2 text-sm text-neutral-400">
+            This account does not have permission to create or manage announcements.
+          </p>
+          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        </section>
+      )}
 
       <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
         <div className="flex items-center justify-between gap-4">
@@ -345,14 +379,16 @@ export default function AdminNewsPage() {
                           Posted {formatPostedDate(item.created_at)}
                         </span>
                       </div>
-                      <InlineDestructiveConfirm
-                        triggerLabel="Delete"
-                        confirmMessage="This announcement is about to be permanently deleted."
-                        confirmLabel="Delete Permanently"
-                        pendingLabel="Deleting..."
-                        busy={deletingId === item.id}
-                        onConfirm={() => confirmDeleteAnnouncement(item.id)}
-                      />
+                      {canDeleteAnnouncements && (
+                        <InlineDestructiveConfirm
+                          triggerLabel="Delete"
+                          confirmMessage="This announcement is about to be permanently deleted."
+                          confirmLabel="Delete Permanently"
+                          pendingLabel="Deleting..."
+                          busy={deletingId === item.id}
+                          onConfirm={() => confirmDeleteAnnouncement(item.id)}
+                        />
+                      )}
                     </div>
                     <p className="mt-2 text-sm text-neutral-300">{previewBody(item.body)}</p>
                     <details className="mt-2 text-sm text-neutral-200">
@@ -385,4 +421,3 @@ export default function AdminNewsPage() {
     </div>
   );
 }
-

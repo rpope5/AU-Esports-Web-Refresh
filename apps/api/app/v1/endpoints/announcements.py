@@ -5,8 +5,12 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_admin
-from app.db.session import SessionLocal
+from app.core.deps import (
+    StaffPrincipal,
+    get_db,
+    require_announcement_deleter,
+    require_announcement_manager,
+)
 from app.models.admin_user import AdminUser
 from app.models.announcement import EsportsAnnouncement
 from app.schemas.announcement import AnnouncementAdminOut, AnnouncementPublicOut
@@ -23,16 +27,6 @@ CONTENT_TYPE_TO_EXTENSION = {
     "image/webp": ".webp",
     "image/gif": ".gif",
 }
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 def _parse_image_extension(upload: UploadFile) -> str:
     content_type = (upload.content_type or "").lower().strip()
     if not content_type.startswith("image/"):
@@ -142,7 +136,7 @@ def create_announcement(
     body: str = Form(..., min_length=1),
     image: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_announcement_manager),
 ):
     clean_title = title.strip()
     clean_body = body.strip()
@@ -156,7 +150,7 @@ def create_announcement(
         image_path = _save_uploaded_image(image)
 
     creator = None
-    username = user.get("sub")
+    username = staff.username
     if username:
         creator = db.query(AdminUser).filter(AdminUser.username == username).first()
 
@@ -177,7 +171,7 @@ def create_announcement(
 def list_announcements_admin(
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    _staff: StaffPrincipal = Depends(require_announcement_manager),
 ):
     rows = (
         db.query(EsportsAnnouncement, AdminUser.username)
@@ -193,7 +187,7 @@ def list_announcements_admin(
 def get_announcement_admin(
     announcement_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    _staff: StaffPrincipal = Depends(require_announcement_manager),
 ):
     row = (
         db.query(EsportsAnnouncement, AdminUser.username)
@@ -267,7 +261,7 @@ def get_announcement_public(
 def delete_announcement_admin(
     announcement_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    _staff: StaffPrincipal = Depends(require_announcement_deleter),
 ):
     item = (
         db.query(EsportsAnnouncement)
