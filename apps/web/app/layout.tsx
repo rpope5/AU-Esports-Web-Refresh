@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Header from "./components/Header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,12 +28,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <a
-          href="https://goashlandeagles.com/"
-          className="text-white text-sm font-medium flex items-center gap-2 hover:text-gray-300 transition-colors"
-        >
-          ← Back to Athletics
-        </a>
+        <Header />
         {children}
       </body>
     </html>
