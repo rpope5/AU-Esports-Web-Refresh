@@ -15,6 +15,7 @@ from app.v1.endpoints import auth_internal
 from app.v1.endpoints import admin_test
 from app.v1.endpoints import recruits_admin
 from app.v1.endpoints import announcements
+from app.v1.endpoints import schedule
 from app.auth.routes import router as auth_router
 
 # Load environment variables
@@ -28,6 +29,7 @@ app.include_router(auth_internal.router, prefix="/api/v1")
 app.include_router(admin_test.router, prefix="/api/v1")
 app.include_router(recruits_admin.router, prefix="/api/v1")
 app.include_router(announcements.router, prefix="/api/v1")
+app.include_router(schedule.router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
 # Database

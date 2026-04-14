@@ -11,6 +11,11 @@ const gameCards = [
     description: "Create and manage esports news announcements",
   },
   {
+    name: "Schedule",
+    href: "/admin/schedule",
+    description: "Create and manage public calendar events",
+  },
+  {
     name: "Valorant",
     href: "/admin/recruits/valorant",
     description: "View and manage Valorant recruits",

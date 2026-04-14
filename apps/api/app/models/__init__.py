@@ -2,6 +2,7 @@
 
 from .admin_user import AdminUser
 from .announcement import EsportsAnnouncement
+from .calendar_event import CalendarEvent
 from .game import Game
 from .recruit import (
     RecruitApplication,
@@ -16,6 +17,7 @@ from .roster import Player
 __all__ = [
     "AdminUser",
     "EsportsAnnouncement",
+    "CalendarEvent",
     "Game",
     "RecruitApplication",
     "RecruitAvailability",

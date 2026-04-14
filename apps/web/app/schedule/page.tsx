@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Image from 'next/image'
 import Link from 'next/link'
-import { link } from "fs";
+import ScheduleCalendar from "./_components/ScheduleCalendar";
 
 export default function Home() {
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
@@ -212,6 +212,7 @@ export default function Home() {
       </header>
 
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
+      <ScheduleCalendar />
       </div>
       );
 }
