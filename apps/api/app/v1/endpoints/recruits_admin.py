@@ -4,8 +4,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from typing import Any
 
-from app.db.session import SessionLocal
-from app.core.deps import require_admin
+from app.core.deps import (
+    StaffPrincipal,
+    apply_game_scope_filter,
+    ensure_game_slug_access,
+    ensure_recruit_access,
+    get_db,
+    require_recruit_deleter,
+    require_recruit_manager,
+    require_recruit_viewer,
+)
 from app.models.admin_user import AdminUser
 from app.models.game import Game
 from app.models.recruit import (
@@ -24,13 +32,6 @@ from app.schemas.admin import (
 from datetime import datetime
 
 router = APIRouter()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 def _build_score_components_summary(explanation_json: Any) -> list[dict[str, float | str | None]] | None:
@@ -73,15 +74,13 @@ def list_recruits_for_game(
     status: str | None = Query(default=None),
     min_score: float | None = Query(default=None),
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_viewer),
 ):
     normalized_status = status.upper() if status else None
     if normalized_status and normalized_status not in RECRUIT_REVIEW_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid status filter")
 
-    game = db.query(Game).filter(Game.slug == game_slug).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
+    game = ensure_game_slug_access(db, staff, game_slug)
 
     query = (
         db.query(
@@ -181,7 +180,7 @@ def export_recruit_training_data(
     submitted_to: datetime | None = Query(default=None),
     limit: int = Query(default=2000, ge=1, le=10000),
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_manager),
 ):
     normalized_status = status.upper() if status else None
     if normalized_status and normalized_status not in RECRUIT_REVIEW_STATUSES:
@@ -221,7 +220,10 @@ def export_recruit_training_data(
     )
 
     if game_slug:
-        query = query.filter(Game.slug == game_slug)
+        game = ensure_game_slug_access(db, staff, game_slug)
+        query = query.filter(Game.id == game.id)
+    else:
+        query = apply_game_scope_filter(query, RecruitGameProfile.game_id, staff)
 
     if normalized_status:
         if normalized_status == "NEW":
@@ -281,7 +283,7 @@ def export_recruit_training_data(
 def get_recruit_detail(
     application_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_viewer),
 ):
     app = (
         db.query(RecruitApplication)
@@ -290,6 +292,7 @@ def get_recruit_detail(
     )
     if not app:
         raise HTTPException(status_code=404, detail="Recruit not found")
+    ensure_recruit_access(db, staff, application_id)
 
     availability = (
         db.query(RecruitAvailability)
@@ -436,7 +439,7 @@ def get_recruit_detail(
 def delete_recruit(
     application_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_deleter),
 ):
     app = (
         db.query(RecruitApplication)
@@ -445,6 +448,7 @@ def delete_recruit(
     )
     if not app:
         raise HTTPException(status_code=404, detail="Recruit not found")
+    ensure_recruit_access(db, staff, application_id)
 
     try:
         reviews_deleted = (
@@ -490,7 +494,7 @@ def update_recruit_status(
     application_id: int,
     data: RecruitStatusUpdate,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_manager),
 ):
     app_exists = (
         db.query(RecruitApplication.id)
@@ -499,9 +503,10 @@ def update_recruit_status(
     )
     if not app_exists:
         raise HTTPException(status_code=404, detail="Recruit not found")
+    ensure_recruit_access(db, staff, application_id)
 
     reviewer_user_id = None
-    reviewer_username = user.get("sub")
+    reviewer_username = staff.username
     if reviewer_username:
         reviewer = (
             db.query(AdminUser)
@@ -552,8 +557,17 @@ def update_recruit_notes(
     application_id: int,
     data: RecruitNotesUpdate,
     db: Session = Depends(get_db),
-    user=Depends(require_admin),
+    staff: StaffPrincipal = Depends(require_recruit_manager),
 ):
+    app_exists = (
+        db.query(RecruitApplication.id)
+        .filter(RecruitApplication.id == application_id)
+        .first()
+    )
+    if not app_exists:
+        raise HTTPException(status_code=404, detail="Recruit not found")
+    ensure_recruit_access(db, staff, application_id)
+
     review = (
         db.query(RecruitReview)
         .filter(RecruitReview.application_id == application_id)

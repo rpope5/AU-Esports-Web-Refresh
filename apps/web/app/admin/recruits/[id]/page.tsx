@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getScoreBand, getScoreBandLegend, usesSmashScoreBands } from "../_components/scoreBands";
+import {
+  clearAdminStorage,
+  formatRoleLabel,
+  parseAdminSession,
+  type AdminSession,
+} from "../../_lib/session";
 
 type ScoreComponent = {
   raw?: number;
@@ -167,6 +173,7 @@ export default function RecruitDetailPage() {
   const params = useParams();
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const [session, setSession] = useState<AdminSession | null>(null);
   const [data, setData] = useState<RecruitDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -186,15 +193,42 @@ export default function RecruitDetailPage() {
       setLoading(true);
       setLoadError(null);
       try {
+        const whoamiRes = await fetch(`${apiUrl}/api/v1/admin/whoami`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (whoamiRes.status === 401) {
+          clearAdminStorage();
+          router.push("/admin/login");
+          return;
+        }
+
+        if (!whoamiRes.ok) {
+          setData(null);
+          setLoadError("Failed to validate admin session.");
+          return;
+        }
+
+        const parsedSession = parseAdminSession(await whoamiRes.json());
+        setSession(parsedSession);
+        if (!parsedSession.permissions.can_view_recruits) {
+          setData(null);
+          setLoadError("You do not have permission to view recruits.");
+          return;
+        }
+
         const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("au_admin_token");
-          localStorage.removeItem("au_admin_role");
-          localStorage.removeItem("au_admin_username");
+        if (res.status === 401) {
+          clearAdminStorage();
           router.push("/admin/login");
+          return;
+        }
+        if (res.status === 403) {
+          setData(null);
+          setLoadError("You are not authorized to access this recruit.");
           return;
         }
 
@@ -225,6 +259,11 @@ export default function RecruitDetailPage() {
   }, [apiUrl, params.id, router]);
 
   async function saveStatus() {
+    if (!session?.permissions.can_manage_recruits) {
+      setLoadError("You do not have permission to manage recruit reviews.");
+      return;
+    }
+
     const token = localStorage.getItem("au_admin_token");
     if (!token) return;
 
@@ -241,43 +280,59 @@ export default function RecruitDetailPage() {
           label_reason: labelReason.trim() ? labelReason.trim() : null,
         }),
       });
-
-      if (res.ok) {
-        const payload = (await res.json()) as {
-          status?: RecruitReviewStatus;
-          label_reason?: string | null;
-          labeled_at?: string | null;
-          reviewer_user_id?: number | null;
-          reviewer_username?: string | null;
-        };
-
-        setData((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            review: {
-              ...prev.review,
-              status: payload.status || status,
-              label_reason: payload.label_reason ?? null,
-              labeled_at: payload.labeled_at ?? null,
-              reviewer_user_id: payload.reviewer_user_id ?? null,
-              reviewer_username: payload.reviewer_username ?? null,
-            },
-          };
-        });
+      if (res.status === 401) {
+        clearAdminStorage();
+        router.push("/admin/login");
+        return;
       }
+      if (res.status === 403) {
+        setLoadError("You do not have permission to manage recruit reviews.");
+        return;
+      }
+      if (!res.ok) {
+        setLoadError("Failed to update recruit status.");
+        return;
+      }
+
+      const payload = (await res.json()) as {
+        status?: RecruitReviewStatus;
+        label_reason?: string | null;
+        labeled_at?: string | null;
+        reviewer_user_id?: number | null;
+        reviewer_username?: string | null;
+      };
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          review: {
+            ...prev.review,
+            status: payload.status || status,
+            label_reason: payload.label_reason ?? null,
+            labeled_at: payload.labeled_at ?? null,
+            reviewer_user_id: payload.reviewer_user_id ?? null,
+            reviewer_username: payload.reviewer_username ?? null,
+          },
+        };
+      });
     } finally {
       setSaving(false);
     }
   }
 
   async function saveNotes() {
+    if (!session?.permissions.can_manage_recruits) {
+      setLoadError("You do not have permission to manage recruit notes.");
+      return;
+    }
+
     const token = localStorage.getItem("au_admin_token");
     if (!token) return;
 
     setSaving(true);
     try {
-      await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}/notes`, {
+      const res = await fetch(`${apiUrl}/api/v1/admin/recruit/${params.id}/notes`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -285,6 +340,18 @@ export default function RecruitDetailPage() {
         },
         body: JSON.stringify({ notes }),
       });
+      if (res.status === 401) {
+        clearAdminStorage();
+        router.push("/admin/login");
+        return;
+      }
+      if (res.status === 403) {
+        setLoadError("You do not have permission to manage recruit notes.");
+        return;
+      }
+      if (!res.ok) {
+        setLoadError("Failed to save recruit notes.");
+      }
     } finally {
       setSaving(false);
     }
@@ -350,6 +417,7 @@ export default function RecruitDetailPage() {
   const usesSmashBands = usesSmashScoreBands(recruitGameSlug);
   const review = data.review;
   const reviewerDisplay = review?.reviewer_username || (review?.reviewer_user_id ? `User #${review.reviewer_user_id}` : "N/A");
+  const canManageRecruit = Boolean(session?.permissions.can_manage_recruits);
 
   return (
     <div className="p-6 space-y-6">
@@ -357,10 +425,16 @@ export default function RecruitDetailPage() {
         <h1 className="text-2xl font-semibold">
           {app.first_name} {app.last_name}
         </h1>
+        {session && (
+          <p className="text-xs text-neutral-500">
+            Signed in as {session.username} - {formatRoleLabel(session.role)}
+          </p>
+        )}
         <p className="text-neutral-400">Email: {app.email}</p>
         <p className="text-neutral-400">Discord: {app.discord}</p>
         <p className="text-sm text-neutral-500">Submitted: {formatTimestampLocal(app.created_at)}</p>
       </div>
+      {loadError && <p className="text-sm text-red-400">{loadError}</p>}
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
         <h2 className="text-lg font-medium">
@@ -550,6 +624,11 @@ export default function RecruitDetailPage() {
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
         <h2 className="text-lg font-medium">Coach Review</h2>
+        {!canManageRecruit && (
+          <p className="mt-2 text-sm text-neutral-400">
+            This account has read-only access to review data.
+          </p>
+        )}
 
         <div className="mt-4 space-y-4">
           <div>
@@ -558,6 +637,7 @@ export default function RecruitDetailPage() {
               className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
               value={status}
               onChange={(e) => setStatus(e.target.value as RecruitReviewStatus)}
+              disabled={!canManageRecruit || saving}
             >
               {REVIEW_STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -571,8 +651,13 @@ export default function RecruitDetailPage() {
               value={labelReason}
               onChange={(e) => setLabelReason(e.target.value)}
               placeholder="Reason for this status/label"
+              disabled={!canManageRecruit || saving}
             />
-            <button onClick={saveStatus} className="mt-2 rounded-lg bg-white px-4 py-2 text-black" disabled={saving}>
+            <button
+              onClick={saveStatus}
+              className="mt-2 rounded-lg bg-white px-4 py-2 text-black disabled:opacity-60"
+              disabled={!canManageRecruit || saving}
+            >
               Save Status
             </button>
           </div>
@@ -583,8 +668,13 @@ export default function RecruitDetailPage() {
               className="mt-1 min-h-[120px] w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              disabled={!canManageRecruit || saving}
             />
-            <button onClick={saveNotes} className="mt-2 rounded-lg bg-white px-4 py-2 text-black" disabled={saving}>
+            <button
+              onClick={saveNotes}
+              className="mt-2 rounded-lg bg-white px-4 py-2 text-black disabled:opacity-60"
+              disabled={!canManageRecruit || saving}
+            >
               Save Notes
             </button>
           </div>

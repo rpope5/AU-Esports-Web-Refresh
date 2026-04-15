@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearAdminStorage } from "../_lib/session";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -30,13 +31,14 @@ export default function AdminLoginPage() {
       if (!res.ok) throw new Error(await res.text());
 
       const data = await res.json();
+      clearAdminStorage();
       localStorage.setItem("au_admin_token", data.access_token);
       localStorage.setItem("au_admin_role", data.role);
       localStorage.setItem("au_admin_username", data.username);
 
       router.push("/admin");
-    } catch (e: any) {
-      setErr(e?.message || "Login failed");
+    } catch (err: unknown) {
+      setErr(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }

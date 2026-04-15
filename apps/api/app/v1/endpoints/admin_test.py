@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
-from app.core.deps import require_admin
+
+from app.core.deps import build_staff_session_payload, get_current_staff
 
 router = APIRouter()
 
 @router.get("/admin/whoami")
-def whoami(user=Depends(require_admin)):
-    # user contains JWT payload: sub + role
-    return {"username": user.get("sub"), "role": user.get("role")}
+def whoami(staff=Depends(get_current_staff)):
+    return build_staff_session_payload(staff)
