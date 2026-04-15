@@ -4,13 +4,9 @@ from app.models.admin_user import AdminUser
 from app.models.game import Game
 from app.models.staff_game_access import StaffGameAccess
 
-TEST_PASSWORD = "TestPass!234"
+TEST_PASSWORD = ""
 TEST_ACCOUNTS = [
-    ("captain_test", "captain", ["valorant"]),
-    ("captain_cs2_test", "captain", ["cs2"]),
-    ("coach_test", "coach", ["cs2"]),
-    ("headcoach_test", "head_coach", []),
-    ("admin_test", "admin", []),
+    
 ]
 
 
