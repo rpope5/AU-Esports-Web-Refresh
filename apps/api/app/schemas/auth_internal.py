@@ -12,6 +12,8 @@ class PermissionPayload(BaseModel):
     can_delete_recruits: bool
     can_manage_announcements: bool
     can_delete_announcements: bool
+    can_manage_schedule: bool
+    can_delete_schedule: bool
     can_manage_users: bool
 
 

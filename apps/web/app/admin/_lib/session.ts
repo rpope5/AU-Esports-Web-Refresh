@@ -4,6 +4,8 @@ export type AdminPermissionKey =
   | "can_delete_recruits"
   | "can_manage_announcements"
   | "can_delete_announcements"
+  | "can_manage_schedule"
+  | "can_delete_schedule"
   | "can_manage_users";
 
 export type AdminPermissions = Record<AdminPermissionKey, boolean>;
@@ -22,6 +24,8 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   can_delete_recruits: false,
   can_manage_announcements: false,
   can_delete_announcements: false,
+  can_manage_schedule: false,
+  can_delete_schedule: false,
   can_manage_users: false,
 };
 
@@ -30,16 +34,20 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_view_recruits: true,
     can_manage_recruits: false,
     can_delete_recruits: false,
-    can_manage_announcements: false,
+    can_manage_announcements: true,
     can_delete_announcements: false,
+    can_manage_schedule: true,
+    can_delete_schedule: false,
     can_manage_users: false,
   },
   coach: {
     can_view_recruits: true,
     can_manage_recruits: true,
     can_delete_recruits: false,
-    can_manage_announcements: false,
+    can_manage_announcements: true,
     can_delete_announcements: false,
+    can_manage_schedule: true,
+    can_delete_schedule: true,
     can_manage_users: false,
   },
   head_coach: {
@@ -48,6 +56,8 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_delete_recruits: true,
     can_manage_announcements: true,
     can_delete_announcements: true,
+    can_manage_schedule: true,
+    can_delete_schedule: true,
     can_manage_users: false,
   },
   admin: {
@@ -56,6 +66,8 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_delete_recruits: true,
     can_manage_announcements: true,
     can_delete_announcements: true,
+    can_manage_schedule: true,
+    can_delete_schedule: true,
     can_manage_users: true,
   },
 };
@@ -84,6 +96,12 @@ function parsePermissions(raw: unknown, role: string): AdminPermissions {
     ),
     can_delete_announcements: Boolean(
       (raw as Partial<AdminPermissions>).can_delete_announcements ?? roleDefaults.can_delete_announcements,
+    ),
+    can_manage_schedule: Boolean(
+      (raw as Partial<AdminPermissions>).can_manage_schedule ?? roleDefaults.can_manage_schedule,
+    ),
+    can_delete_schedule: Boolean(
+      (raw as Partial<AdminPermissions>).can_delete_schedule ?? roleDefaults.can_delete_schedule,
     ),
     can_manage_users: Boolean((raw as Partial<AdminPermissions>).can_manage_users ?? roleDefaults.can_manage_users),
   };

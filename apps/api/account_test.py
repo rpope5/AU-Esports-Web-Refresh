@@ -5,7 +5,7 @@ from app.models.game import Game
 from app.models.staff_game_access import StaffGameAccess
 
 ACCOUNTS = [
-    ("rpope5",   "One4cigs2370!",   "captain",    ["mario-kart", "smash"]),
+    ("rpope_coach",   "One4cigs2370!",   "coach",    ["mario-kart", "smash"]),
     
 ]
 

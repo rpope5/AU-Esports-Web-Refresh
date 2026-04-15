@@ -127,6 +127,8 @@ require_recruit_manager = require_permission("can_manage_recruits")
 require_recruit_deleter = require_permission("can_delete_recruits")
 require_announcement_manager = require_permission("can_manage_announcements")
 require_announcement_deleter = require_permission("can_delete_announcements")
+require_schedule_manager = require_permission("can_manage_schedule")
+require_schedule_deleter = require_permission("can_delete_schedule")
 require_user_manager = require_permission("can_manage_users")
 
 

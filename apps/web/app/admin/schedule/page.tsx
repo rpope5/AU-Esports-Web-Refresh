@@ -4,71 +4,68 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
+
+type ScheduleStatus = "pending" | "published" | "rejected" | "archived";
+type CreateWorkflowAction = "publish" | "submit_for_approval";
+type TransitionAction = "submit" | "approve" | "reject" | "archive";
+
 type CalendarEvent = {
   id: number;
   name: string;
   time: string;
-  game: string | null;
-  created_at: string;
-  updated_at: string;
+  game_slug: string | null;
+  game_name: string | null;
+  status: ScheduleStatus;
+  created_by_username: string | null;
+  approved_by_username: string | null;
+  rejected_by_username: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  rejected_at: string | null;
+  archived_at: string | null;
 };
 
-type AdminUser = {
-  username: string;
-  role: string;
-};
+type GameOption = { slug: string; name: string };
+const ALL_GAME_OPTIONS: GameOption[] = [
+  { slug: "valorant", name: "Valorant" },
+  { slug: "cs2", name: "Counter-Strike 2" },
+  { slug: "fortnite", name: "Fortnite" },
+  { slug: "r6", name: "Rainbow Six Siege" },
+  { slug: "rocket-league", name: "Rocket League" },
+  { slug: "overwatch", name: "Overwatch" },
+  { slug: "cod", name: "Call of Duty" },
+  { slug: "hearthstone", name: "Hearthstone" },
+  { slug: "smash", name: "Super Smash Bros. Ultimate" },
+  { slug: "mario-kart", name: "Mario Kart" },
+];
 
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+function formatDate(raw: string | null | undefined): string {
+  if (!raw) return "N/A";
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(raw);
+  const parsed = new Date(hasTimezone ? raw : `${raw}Z`);
+  if (Number.isNaN(parsed.getTime())) return "N/A";
+  return parsed.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+function statusClass(status: ScheduleStatus): string {
+  if (status === "pending") return "border-amber-700/70 bg-amber-950/30 text-amber-200";
+  if (status === "published") return "border-emerald-700/70 bg-emerald-950/30 text-emerald-200";
+  if (status === "rejected") return "border-red-700/70 bg-red-950/30 text-red-200";
+  return "border-neutral-700 bg-neutral-900 text-neutral-300";
 }
 
-function startOfWeek(date: Date): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() - copy.getDay());
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+function statusLabel(status: ScheduleStatus): string {
+  if (status === "pending") return "Pending Approval";
+  if (status === "published") return "Published";
+  if (status === "rejected") return "Rejected";
+  return "Archived";
 }
 
-function endOfWeek(date: Date): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + (6 - copy.getDay()));
-  copy.setHours(23, 59, 59, 999);
-  return copy;
-}
-
-function parseBackendTimestamp(rawValue: string): Date | null {
-  const trimmed = rawValue?.trim();
-  if (!trimmed) return null;
-  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(trimmed);
-  const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
-  const parsed = new Date(normalized);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function dateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatEventTime(rawValue: string): string {
-  const parsed = parseBackendTimestamp(rawValue);
-  if (!parsed) return rawValue;
-  return parsed.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function toDateTimeLocalValue(rawValue: string): string {
-  const parsed = parseBackendTimestamp(rawValue);
-  if (!parsed) return "";
-
+function toLocalInputValue(raw: string): string {
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(raw);
+  const parsed = new Date(hasTimezone ? raw : `${raw}Z`);
+  if (Number.isNaN(parsed.getTime())) return "";
   const year = parsed.getFullYear();
   const month = String(parsed.getMonth() + 1).padStart(2, "0");
   const day = String(parsed.getDate()).padStart(2, "0");
@@ -77,94 +74,90 @@ function toDateTimeLocalValue(rawValue: string): string {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
-function localInputToIso(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error("Please provide a valid date and time.");
-  }
-  return parsed.toISOString();
+function canPublish(session: AdminSession | null): boolean {
+  return session?.role === "coach" || session?.role === "head_coach" || session?.role === "admin";
 }
 
 export default function AdminSchedulePage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  const [me, setMe] = useState<AdminUser | null>(null);
-  const [isSessionReady, setIsSessionReady] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [session, setSession] = useState<AdminSession | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"all" | ScheduleStatus>("all");
+  const [name, setName] = useState("");
+  const [time, setTime] = useState("");
+  const [gameSlug, setGameSlug] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
-
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createTime, setCreateTime] = useState("");
-  const [createGame, setCreateGame] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
-  const [isEditingEvent, setIsEditingEvent] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editTime, setEditTime] = useState("");
-  const [editGame, setEditGame] = useState("");
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const canManageSchedule = Boolean(session?.permissions.can_manage_schedule);
+  const canDeleteSchedule = Boolean(session?.permissions.can_delete_schedule);
+
+  const availableGames = useMemo(() => {
+    if (!session) return [];
+    if (session.has_global_game_access) return ALL_GAME_OPTIONS;
+    return ALL_GAME_OPTIONS.filter((game) => session.allowed_game_slugs.includes(game.slug));
+  }, [session]);
+
+  useEffect(() => {
+    if (!gameSlug && availableGames.length > 0) {
+      setGameSlug(availableGames[0].slug);
+    }
+  }, [availableGames, gameSlug]);
 
   const clearSessionAndRedirect = useCallback(() => {
-    localStorage.removeItem("au_admin_token");
-    localStorage.removeItem("au_admin_role");
-    localStorage.removeItem("au_admin_username");
+    clearAdminStorage();
     router.push("/admin/login");
   }, [router]);
 
-  const getAdminToken = useCallback((): string | null => {
+  const getToken = useCallback(() => {
     const token = localStorage.getItem("au_admin_token");
-    if (!token) {
-      router.push("/admin/login");
-      return null;
-    }
+    if (!token) router.push("/admin/login");
     return token;
   }, [router]);
 
   const loadEvents = useCallback(async () => {
-    if (!isSessionReady) return;
-    const token = getAdminToken();
+    if (!canManageSchedule) {
+      setLoading(false);
+      return;
+    }
+
+    const token = getToken();
     if (!token) return;
 
-    setLoadingEvents(true);
+    setLoading(true);
     setError(null);
     try {
-      const monthStart = startOfMonth(currentMonth);
-      const monthEnd = endOfMonth(currentMonth);
-      const params = new URLSearchParams({
-        start: monthStart.toISOString(),
-        end: monthEnd.toISOString(),
-      });
+      const params = new URLSearchParams({ limit: "500" });
+      if (statusFilter !== "all") params.set("status", statusFilter);
 
       const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearSessionAndRedirect();
         return;
       }
-
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(body || "Failed to load schedule events");
+      if (response.status === 403) {
+        setEvents([]);
+        setError("You do not have permission to manage schedule items.");
+        return;
       }
+      if (!response.ok) throw new Error((await response.text()) || "Failed to load schedule items");
 
       const data = (await response.json()) as CalendarEvent[];
       setEvents(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
-      setEvents([]);
-      setError(err instanceof Error ? err.message : "Failed to load schedule events");
+      setError(err instanceof Error ? err.message : "Failed to load schedule items");
     } finally {
-      setLoadingEvents(false);
+      setLoading(false);
     }
-  }, [apiUrl, clearSessionAndRedirect, currentMonth, getAdminToken, isSessionReady]);
+  }, [apiUrl, canManageSchedule, clearSessionAndRedirect, getToken, statusFilter]);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -178,15 +171,14 @@ export default function AdminSchedulePage() {
         const response = await fetch(`${apiUrl}/api/v1/admin/whoami`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) {
+        if (response.status === 401) {
           clearSessionAndRedirect();
           return;
         }
-        const data = (await response.json()) as AdminUser;
-        setMe(data);
-        setIsSessionReady(true);
-      } catch {
-        clearSessionAndRedirect();
+        if (!response.ok) throw new Error(await response.text());
+        setSession(parseAdminSession(await response.json()));
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to initialize session");
       }
     };
 
@@ -197,68 +189,18 @@ export default function AdminSchedulePage() {
     void loadEvents();
   }, [loadEvents]);
 
-  useEffect(() => {
-    if (!activeEvent) return;
-    setIsEditingEvent(false);
-    setEditName(activeEvent.name);
-    setEditTime(toDateTimeLocalValue(activeEvent.time));
-    setEditGame(activeEvent.game ?? "");
-  }, [activeEvent]);
-
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    for (const event of events) {
-      const parsed = parseBackendTimestamp(event.time);
-      if (!parsed) continue;
-      const key = dateKey(parsed);
-      const bucket = map.get(key) || [];
-      bucket.push(event);
-      map.set(key, bucket);
-    }
-
-    for (const [, bucket] of map) {
-      bucket.sort((a, b) => {
-        const aTime = parseBackendTimestamp(a.time)?.getTime() ?? 0;
-        const bTime = parseBackendTimestamp(b.time)?.getTime() ?? 0;
-        return aTime - bTime;
-      });
-    }
-
-    return map;
-  }, [events]);
-
-  const monthLabel = useMemo(
-    () =>
-      currentMonth.toLocaleString(undefined, {
-        month: "long",
-        year: "numeric",
-      }),
-    [currentMonth],
-  );
-
-  const calendarDays = useMemo(() => {
-    const first = startOfWeek(startOfMonth(currentMonth));
-    const last = endOfWeek(endOfMonth(currentMonth));
-    const days: Date[] = [];
-    const cursor = new Date(first);
-    while (cursor <= last) {
-      days.push(new Date(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    return days;
-  }, [currentMonth]);
-
-  async function handleCreateEvent(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function createScheduleItem(action: CreateWorkflowAction): Promise<void> {
+    const token = getToken();
+    if (!token) return;
     setError(null);
     setSuccess(null);
 
-    const token = getAdminToken();
-    if (!token) return;
-
-    const cleanName = createName.trim();
-    if (!cleanName) {
-      setError("Event name is required.");
+    if (!name.trim() || !time || !gameSlug) {
+      setError("Name, date/time, and game are required.");
+      return;
+    }
+    if (session?.role === "captain" && action === "publish") {
+      setError("Captains can only submit schedule items for approval.");
       return;
     }
 
@@ -266,416 +208,234 @@ export default function AdminSchedulePage() {
     try {
       const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: cleanName,
-          time: localInputToIso(createTime),
-          game: createGame.trim() ? createGame.trim() : null,
+          name: name.trim(),
+          time: new Date(time).toISOString(),
+          game_slug: gameSlug,
+          workflow_action: action,
         }),
       });
-
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearSessionAndRedirect();
         return;
       }
+      if (!response.ok) throw new Error((await response.text()) || "Failed to create schedule item");
 
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(body || "Failed to create event");
-      }
-
-      setShowCreateModal(false);
-      setCreateName("");
-      setCreateTime("");
-      setCreateGame("");
-      setSuccess("Event created.");
+      setName("");
+      setTime("");
+      setSuccess(action === "publish" ? "Schedule item published." : "Schedule item submitted for approval.");
       await loadEvents();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create event");
+      setError(err instanceof Error ? err.message : "Failed to create schedule item");
     } finally {
       setCreating(false);
     }
   }
 
-  async function handleUpdateEvent() {
-    if (!activeEvent) return;
-
+  async function transition(eventId: number, action: TransitionAction): Promise<void> {
+    const token = getToken();
+    if (!token) return;
+    setBusyId(eventId);
     setError(null);
     setSuccess(null);
-    const token = getAdminToken();
+    try {
+      const route =
+        action === "submit"
+          ? `${apiUrl}/api/v1/admin/schedule/events/${eventId}/submit`
+          : action === "approve"
+            ? `${apiUrl}/api/v1/admin/schedule/events/${eventId}/approve`
+            : action === "reject"
+              ? `${apiUrl}/api/v1/admin/schedule/events/${eventId}/reject`
+              : `${apiUrl}/api/v1/admin/schedule/events/${eventId}/archive`;
+
+      const response = await fetch(route, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      if (response.status === 401) {
+        clearSessionAndRedirect();
+        return;
+      }
+      if (!response.ok) throw new Error((await response.text()) || "Failed to change schedule state");
+
+      setSuccess("Schedule item updated.");
+      await loadEvents();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to change schedule state");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function editEvent(item: CalendarEvent): Promise<void> {
+    const token = getToken();
     if (!token) return;
 
-    const cleanName = editName.trim();
-    if (!cleanName) {
-      setError("Event name is required.");
+    const nextName = window.prompt("Schedule item name", item.name);
+    if (nextName === null) return;
+    const nextTimeInput = window.prompt(
+      "Date/time (local, YYYY-MM-DDTHH:mm)",
+      toLocalInputValue(item.time),
+    );
+    if (nextTimeInput === null) return;
+    const nextGameSlug = window.prompt("Game slug", item.game_slug || gameSlug);
+    if (nextGameSlug === null) return;
+
+    const cleanName = nextName.trim();
+    const cleanGameSlug = nextGameSlug.trim();
+    if (!cleanName || !nextTimeInput.trim() || !cleanGameSlug) {
+      setError("Name, date/time, and game slug are required for edits.");
       return;
     }
 
-    setUpdating(true);
+    const parsed = new Date(nextTimeInput.trim());
+    if (Number.isNaN(parsed.getTime())) {
+      setError("Invalid date/time format.");
+      return;
+    }
+
+    setBusyId(item.id);
+    setError(null);
+    setSuccess(null);
     try {
-      const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events/${activeEvent.id}`, {
+      const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events/${item.id}`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           name: cleanName,
-          time: localInputToIso(editTime),
-          game: editGame.trim() ? editGame.trim() : null,
+          time: parsed.toISOString(),
+          game_slug: cleanGameSlug,
         }),
       });
-
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearSessionAndRedirect();
         return;
       }
-
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(body || "Failed to update event");
-      }
-
-      const updated = (await response.json()) as CalendarEvent;
-      setActiveEvent(updated);
-      setIsEditingEvent(false);
-      setSuccess("Event updated.");
+      if (!response.ok) throw new Error((await response.text()) || "Failed to edit schedule item");
+      setSuccess("Schedule item updated.");
       await loadEvents();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update event");
+      setError(err instanceof Error ? err.message : "Failed to edit schedule item");
     } finally {
-      setUpdating(false);
+      setBusyId(null);
     }
   }
 
-  async function handleDeleteEvent() {
-    if (!activeEvent) return;
-
-    const shouldDelete = window.confirm("Delete this event permanently?");
-    if (!shouldDelete) return;
-
-    setError(null);
-    setSuccess(null);
-    const token = getAdminToken();
+  async function removeEvent(eventId: number): Promise<void> {
+    const token = getToken();
     if (!token) return;
-
-    setDeleting(true);
+    if (!window.confirm("Delete this schedule item permanently?")) return;
+    setBusyId(eventId);
     try {
-      const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events/${activeEvent.id}`, {
+      const response = await fetch(`${apiUrl}/api/v1/admin/schedule/events/${eventId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         clearSessionAndRedirect();
         return;
       }
-
-      if (response.status !== 204) {
-        const body = await response.text();
-        throw new Error(body || "Failed to delete event");
-      }
-
-      setActiveEvent(null);
-      setIsEditingEvent(false);
-      setSuccess("Event deleted.");
+      if (response.status !== 204) throw new Error((await response.text()) || "Failed to delete schedule item");
+      setSuccess("Schedule item deleted.");
       await loadEvents();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete event");
+      setError(err instanceof Error ? err.message : "Failed to delete schedule item");
     } finally {
-      setDeleting(false);
+      setBusyId(null);
     }
   }
 
-  const prevMonth = () =>
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  const nextMonth = () =>
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Schedule Calendar Admin</h1>
+          <h1 className="text-2xl font-semibold">Schedule Workflow Admin</h1>
           <p className="mt-1 text-sm text-neutral-400">
-            {me ? `Signed in as ${me.username} - ${me.role}` : "Loading session..."}
+            {session ? `Signed in as ${session.username} - ${formatRoleLabel(session.role)}` : "Loading session..."}
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm hover:border-neutral-700"
-        >
+        <Link href="/admin" className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm hover:border-neutral-700">
           Back to Admin
         </Link>
       </div>
 
-      <section className="mx-auto mt-6 w-full max-w-7xl rounded-lg border border-[#FFC72C]/40 bg-[#111111] p-4 md:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={prevMonth}
-            className="rounded border border-[#FFC72C]/60 px-3 py-1 text-sm text-[#FFC72C] transition hover:bg-[#FFC72C]/10"
-            aria-label="Previous month"
-          >
-            Prev
-          </button>
-
-          <h2 className="text-xl font-semibold text-white">{monthLabel}</h2>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="rounded border border-[#FFC72C]/60 px-3 py-1 text-sm text-[#FFC72C] transition hover:bg-[#FFC72C]/10"
-              aria-label="Next month"
-            >
-              Next
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreateModal(true);
-                setActiveEvent(null);
-                setCreateName("");
-                setCreateTime("");
-                setCreateGame("");
-              }}
-              className="rounded border border-[#FFC72C] bg-[#5C068C]/80 px-3 py-1 text-sm font-medium text-white transition hover:bg-[#5C068C]"
-            >
-              Create Event
-            </button>
+      {canManageSchedule && (
+        <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+          <h2 className="text-xl font-medium">Submit Schedule Item</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <input className="rounded border border-neutral-700 bg-black p-2 text-sm" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} />
+            <input className="rounded border border-neutral-700 bg-black p-2 text-sm" type="datetime-local" value={time} onChange={(event) => setTime(event.target.value)} />
+            <select className="rounded border border-neutral-700 bg-black p-2 text-sm" value={gameSlug} onChange={(event) => setGameSlug(event.target.value)}>
+              {availableGames.map((game) => (
+                <option key={game.slug} value={game.slug}>{game.name}</option>
+              ))}
+            </select>
           </div>
-        </div>
-
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-[#FFC72C]/90 md:text-sm">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {loadingEvents ? (
-          <div className="rounded border border-dashed border-[#FFC72C]/30 py-10 text-center text-sm text-gray-300">
-            Loading calendar...
+          <div className="mt-3 flex flex-wrap gap-2">
+            {canPublish(session) && (
+              <button className="rounded border border-emerald-700/80 bg-emerald-950/30 px-3 py-1 text-sm text-emerald-100 disabled:opacity-60" disabled={creating} onClick={() => void createScheduleItem("publish")}>
+                {creating ? "Publishing..." : "Publish"}
+              </button>
+            )}
+            <button className="rounded border border-amber-700/80 bg-amber-950/30 px-3 py-1 text-sm text-amber-100 disabled:opacity-60" disabled={creating} onClick={() => void createScheduleItem("submit_for_approval")}>
+              {creating ? "Submitting..." : "Submit for Approval"}
+            </button>
+            <select className="rounded border border-neutral-700 bg-black px-2 py-1 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | ScheduleStatus)}>
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="published">Published</option>
+              <option value="rejected">Rejected</option>
+              <option value="archived">Archived</option>
+            </select>
           </div>
+        </section>
+      )}
+
+      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {success && <p className="mt-4 text-sm text-emerald-400">{success}</p>}
+
+      <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+        <h2 className="text-xl font-medium">Schedule Items</h2>
+        {loading ? (
+          <p className="mt-4 text-sm text-neutral-400">Loading schedule items...</p>
         ) : (
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day) => {
-              const inMonth = day.getMonth() === currentMonth.getMonth();
-              const dayEvents = eventsByDay.get(dateKey(day)) || [];
+          <div className="mt-4 grid gap-3">
+            {events.map((item) => {
+              const busy = busyId === item.id;
+              const canSubmit = session?.role === "captain" && item.created_by_username === session.username && item.status === "pending";
+              const canEdit =
+                (session?.role === "coach" || session?.role === "head_coach" || session?.role === "admin") ||
+                (session?.role === "captain" && item.created_by_username === session.username && item.status === "pending");
+              const canApprove = canPublish(session) && item.status !== "published";
+              const canReject = canPublish(session) && item.status === "pending";
+              const canArchive = canPublish(session) && item.status === "published";
               return (
-                <div
-                  key={day.toISOString()}
-                  className={`min-h-[7.5rem] rounded border p-2 ${
-                    inMonth
-                      ? "border-[#FFC72C]/20 bg-black"
-                      : "border-[#5C068C]/20 bg-black/60 text-gray-500"
-                  }`}
-                >
-                  <div className="mb-2 text-xs font-semibold text-[#FFC72C] md:text-sm">{day.getDate()}</div>
-                  <div className="space-y-1">
-                    {dayEvents.map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => setActiveEvent(event)}
-                        className="block w-full truncate rounded bg-[#5C068C]/70 px-2 py-1 text-left text-xs text-white transition hover:bg-[#5C068C] focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
-                        title={event.name}
-                      >
-                        {event.name}
-                      </button>
-                    ))}
+                <article key={item.id} className="rounded-xl border border-neutral-800 bg-black/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold">{item.name}</h3>
+                      <p className="text-sm text-neutral-400">{formatDate(item.time)} | {item.game_name || item.game_slug || "Unknown game"}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className={`rounded-full border px-2 py-0.5 ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
+                        <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-neutral-300">Created by: {item.created_by_username || "Unknown"}</span>
+                        {item.approved_by_username && <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-neutral-300">Approved by: {item.approved_by_username}</span>}
+                        {item.rejected_by_username && <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-neutral-300">Rejected by: {item.rejected_by_username}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {canEdit && <button className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100 disabled:opacity-60" disabled={busy} onClick={() => void editEvent(item)}>{busy ? "Working..." : "Edit"}</button>}
+                      {canSubmit && <button className="rounded border border-amber-700/80 bg-amber-950/30 px-2 py-1 text-xs text-amber-100 disabled:opacity-60" disabled={busy} onClick={() => void transition(item.id, "submit")}>{busy ? "Working..." : "Submit"}</button>}
+                      {canApprove && <button className="rounded border border-emerald-700/80 bg-emerald-950/30 px-2 py-1 text-xs text-emerald-100 disabled:opacity-60" disabled={busy} onClick={() => void transition(item.id, "approve")}>{busy ? "Working..." : "Approve"}</button>}
+                      {canReject && <button className="rounded border border-red-700/80 bg-red-950/30 px-2 py-1 text-xs text-red-100 disabled:opacity-60" disabled={busy} onClick={() => void transition(item.id, "reject")}>{busy ? "Working..." : "Reject"}</button>}
+                      {canArchive && <button className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100 disabled:opacity-60" disabled={busy} onClick={() => void transition(item.id, "archive")}>{busy ? "Working..." : "Archive"}</button>}
+                      {canDeleteSchedule && <button className="rounded border border-red-700 px-2 py-1 text-xs text-red-300 disabled:opacity-60" disabled={busy} onClick={() => void removeEvent(item.id)}>{busy ? "Working..." : "Delete"}</button>}
+                    </div>
                   </div>
-                </div>
+                </article>
               );
             })}
+            {!events.length && <p className="text-sm text-neutral-400">No schedule items found for this filter.</p>}
           </div>
         )}
-
-        {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
-        {success && <p className="mt-4 text-sm text-emerald-300">{success}</p>}
       </section>
-
-      {showCreateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-event-title"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-[#FFC72C]/50 bg-[#151515] p-5 text-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="create-event-title" className="text-lg font-semibold text-[#FFC72C]">
-              Create Event
-            </h3>
-            <form className="mt-4 space-y-3" onSubmit={handleCreateEvent}>
-              <div>
-                <label className="text-sm text-neutral-300">Event Name</label>
-                <input
-                  className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="Event name"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm text-neutral-300">Time</label>
-                <input
-                  className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                  type="datetime-local"
-                  value={createTime}
-                  onChange={(e) => setCreateTime(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm text-neutral-300">Game (Optional)</label>
-                <input
-                  className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                  value={createGame}
-                  onChange={(e) => setCreateGame(e.target.value)}
-                  placeholder="e.g. Valorant"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="rounded border border-[#FFC72C]/60 px-3 py-1 text-sm text-[#FFC72C] hover:bg-[#FFC72C]/10"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="rounded border border-[#FFC72C] bg-[#5C068C]/80 px-3 py-1 text-sm font-medium text-white hover:bg-[#5C068C] disabled:opacity-60"
-                >
-                  {creating ? "Creating..." : "Create"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeEvent && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="calendar-event-title"
-          onClick={() => setActiveEvent(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-[#FFC72C]/50 bg-[#151515] p-5 text-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <h3 id="calendar-event-title" className="text-lg font-semibold text-[#FFC72C]">
-                {isEditingEvent ? "Edit Event" : activeEvent.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setActiveEvent(null)}
-                className="rounded border border-[#FFC72C]/60 px-2 py-1 text-xs text-[#FFC72C] hover:bg-[#FFC72C]/10"
-              >
-                Close
-              </button>
-            </div>
-
-            {isEditingEvent ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm text-neutral-300">Event Name</label>
-                  <input
-                    className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-300">Time</label>
-                  <input
-                    className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                    type="datetime-local"
-                    value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-300">Game (Optional)</label>
-                  <input
-                    className="mt-1 w-full rounded border border-neutral-700 bg-black p-2 text-sm text-white"
-                    value={editGame}
-                    onChange={(e) => setEditGame(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2 text-sm">
-                <p>
-                  <span className="font-semibold text-[#FFC72C]">Time:</span> {formatEventTime(activeEvent.time)}
-                </p>
-                <p>
-                  <span className="font-semibold text-[#FFC72C]">Game:</span>{" "}
-                  {activeEvent.game && activeEvent.game.trim() ? activeEvent.game : "N/A"}
-                </p>
-              </div>
-            )}
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              {isEditingEvent ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void handleUpdateEvent()}
-                    disabled={updating || deleting}
-                    className="rounded border border-[#FFC72C] bg-[#5C068C]/80 px-3 py-1 text-sm font-medium text-white hover:bg-[#5C068C] disabled:opacity-60"
-                  >
-                    {updating ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingEvent(false)}
-                    disabled={updating || deleting}
-                    className="rounded border border-[#FFC72C]/60 px-3 py-1 text-sm text-[#FFC72C] hover:bg-[#FFC72C]/10"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingEvent(true)}
-                  disabled={updating || deleting}
-                  className="rounded border border-[#FFC72C]/60 px-3 py-1 text-sm text-[#FFC72C] hover:bg-[#FFC72C]/10 disabled:opacity-60"
-                >
-                  Edit Event
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => void handleDeleteEvent()}
-                disabled={updating || deleting}
-                className="rounded border border-red-700 px-3 py-1 text-sm text-red-300 hover:bg-red-950/50 disabled:opacity-60"
-              >
-                {deleting ? "Deleting..." : "Delete Event"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

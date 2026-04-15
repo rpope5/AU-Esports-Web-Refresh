@@ -122,6 +122,28 @@ const REVIEW_STATUS_OPTIONS: RecruitReviewStatus[] = [
   "REJECTED",
 ];
 
+function formatGameTitle(slug?: string | null): string {
+  if (!slug) return "Admin";
+
+  const labels: Record<string, string> = {
+    cs2: "CS2",
+    cod: "Call of Duty",
+    call_of_duty: "Call of Duty",
+    fortnite: "Fortnite",
+    valorant: "Valorant",
+    smash: "Smash",
+    mario_kart: "Mario Kart",
+    mario_kart_world: "Mario Kart",
+    rocket_league: "Rocket League",
+    rainbow_six: "Rainbow Six",
+    rainbow_six_siege: "Rainbow Six Siege",
+    overwatch: "Overwatch",
+    hearthstone: "Hearthstone",
+  };
+
+  return labels[slug] ?? prettyKey(slug);
+}
+
 function parseBackendTimestamp(value?: string): Date | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -418,22 +440,35 @@ export default function RecruitDetailPage() {
   const review = data.review;
   const reviewerDisplay = review?.reviewer_username || (review?.reviewer_user_id ? `User #${review.reviewer_user_id}` : "N/A");
   const canManageRecruit = Boolean(session?.permissions.can_manage_recruits);
+  const backToGameHref = recruitGameSlug
+    ? `/admin/recruits/${recruitGameSlug}`
+    : "/admin";
+  const backToGameLabel = recruitGameSlug
+    ? `Back to ${formatGameTitle(recruitGameSlug)}`
+    : "Back to Admin";
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">
-          {app.first_name} {app.last_name}
-        </h1>
         {session && (
           <p className="text-xs text-neutral-500">
             Signed in as {session.username} - {formatRoleLabel(session.role)}
           </p>
         )}
+        <h1 className="text-2xl font-semibold">
+          {app.first_name} {app.last_name}
+        </h1>
         <p className="text-neutral-400">Email: {app.email}</p>
         <p className="text-neutral-400">Discord: {app.discord}</p>
         <p className="text-sm text-neutral-500">Submitted: {formatTimestampLocal(app.created_at)}</p>
       </div>
+
+      <Link
+        href={backToGameHref}
+        className="inline-flex shrink-0 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 transition hover:bg-neutral-800"
+      >
+        {backToGameLabel}
+      </Link>
       {loadError && <p className="text-sm text-red-400">{loadError}</p>}
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">

@@ -7,9 +7,10 @@ import { canAccessGame, clearAdminStorage, formatRoleLabel, parseAdminSession, t
 
 type RecruitGameCard = {
   name: string;
-  slug: string;
+  slug?: string;
   href: string;
   description: string;
+  requiredPermission?: keyof AdminSession["permissions"];
 };
 
 const RECRUIT_GAME_CARDS: RecruitGameCard[] = [
@@ -17,6 +18,7 @@ const RECRUIT_GAME_CARDS: RecruitGameCard[] = [
     name: "Schedule",
     href: "/admin/schedule",
     description: "Create and manage public calendar events",
+    requiredPermission: "can_manage_schedule",
   },
   {
     name: "Valorant",
@@ -89,7 +91,13 @@ export default function AdminHome() {
 
   const visibleRecruitCards = useMemo(() => {
     if (!me) return [];
-    return RECRUIT_GAME_CARDS.filter((game) => canAccessGame(me, game.slug));
+    return RECRUIT_GAME_CARDS.filter((game) => {
+      if (game.requiredPermission && !me.permissions[game.requiredPermission]) {
+        return false;
+      }
+      if (!game.slug) return true;
+      return canAccessGame(me, game.slug);
+    });
   }, [me]);
 
   useEffect(() => {
@@ -168,7 +176,7 @@ export default function AdminHome() {
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {visibleRecruitCards.map((game) => (
           <Link
-            key={game.slug}
+            key={game.href}
             href={game.href}
             className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 transition hover:border-neutral-700"
           >

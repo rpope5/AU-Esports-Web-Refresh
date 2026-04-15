@@ -10,6 +10,8 @@ PermissionName = Literal[
     "can_delete_recruits",
     "can_manage_announcements",
     "can_delete_announcements",
+    "can_manage_schedule",
+    "can_delete_schedule",
     "can_manage_users",
 ]
 
@@ -24,6 +26,8 @@ class StaffPermissions:
     can_delete_recruits: bool
     can_manage_announcements: bool
     can_delete_announcements: bool
+    can_manage_schedule: bool
+    can_delete_schedule: bool
     can_manage_users: bool
 
     def to_dict(self) -> dict[str, bool]:
@@ -37,6 +41,8 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_delete_recruits=False,
         can_manage_announcements=True,
         can_delete_announcements=False,
+        can_manage_schedule=True,
+        can_delete_schedule=False,
         can_manage_users=False,
     ),
     "coach": StaffPermissions(
@@ -45,6 +51,8 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_delete_recruits=False,
         can_manage_announcements=True,
         can_delete_announcements=False,
+        can_manage_schedule=True,
+        can_delete_schedule=True,
         can_manage_users=False,
     ),
     "head_coach": StaffPermissions(
@@ -53,6 +61,8 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_delete_recruits=True,
         can_manage_announcements=True,
         can_delete_announcements=True,
+        can_manage_schedule=True,
+        can_delete_schedule=True,
         can_manage_users=False,
     ),
     "admin": StaffPermissions(
@@ -61,6 +71,8 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_delete_recruits=True,
         can_manage_announcements=True,
         can_delete_announcements=True,
+        can_manage_schedule=True,
+        can_delete_schedule=True,
         can_manage_users=True,
     ),
 }
