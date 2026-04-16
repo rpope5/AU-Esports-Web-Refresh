@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import Header from "../components/Header";
 
 type Match = {
   id: number;
@@ -205,37 +206,45 @@ export default function NewsPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="match-bar">
-        <button
-          className="match-arrow"
-          onClick={prevMatches}
-          aria-label="Previous matches"
-          disabled={matchStart === 0}
-        >
-          &larr;
-        </button>
-        <div className="match-list">
-          {matches.slice(matchStart, matchStart + matchesToShow).map((match) => (
-            <div className="match-item" key={match.id}>
-              <div className="match-teams">
-                <span className="team-name">{match.ourTeam}</span>
-                <span className="versus">vs</span>
-                <span className="team-opponent">{match.opponent}</span>
-              </div>
-              <div className="match-game">{match.game}</div>
-              <div className="match-time">{match.time}</div>
+    
+          <div className="grid grid-cols-3 items-center w-full px-4">
+    
+            <div className="justify-self-start">
+              <Header />
             </div>
-          ))}
-        </div>
-        <button
-          className="match-arrow"
-          onClick={nextMatches}
-          aria-label="Next matches"
-          disabled={matchStart >= matches.length - matchesToShow}
-        >
-          &rarr;
-        </button>
-      </div>
+    
+            <div className="justify-self-center">
+              <div className="match-bar inline-flex items-center">
+                <button onClick={prevMatches} disabled={matchStart === 0}>
+                  &larr;
+                </button>
+    
+                <div className="match-list">
+                  {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
+                    <div className="match-item" key={m.id}>
+                      <div className="match-teams">
+                        <span className="team-name">{m.ourTeam}</span>
+                        <span className="versus">vs</span>
+                        <span className="team-opponent">{m.opponent}</span>
+                      </div>
+                      <div className="match-game">{m.game}</div>
+                      <div className="match-time">{m.time}</div>
+                    </div>
+                  ))}
+                </div>
+    
+                <button
+                  onClick={nextMatches}
+                  disabled={matchStart >= matches.length - matchesToShow}
+                >
+                  &rarr;
+                </button>
+              </div>
+            </div>
+    
+            <div />
+    
+          </div>
 
       <header className="site-header flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
         <div className="flex items-center gap-2">

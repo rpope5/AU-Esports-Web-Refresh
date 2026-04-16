@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import Header from "../components/Header";
 
 type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone" | "smash" | "mario-kart";
 
@@ -778,40 +779,46 @@ const [isLive, setIsLive] = useState(false);
     return () => clearInterval(interval);
   }, []);
   return (
-    <div className="min-h-screen bg-black text-white recruit-dropdown-theme">
-      <div className="match-bar">
-        <button
-          className="match-arrow"
-          onClick={prevMatches}
-          aria-label="Previous matches"
-          disabled={matchStart === 0}
-        >
-          &larr;
-        </button>
-
-        <div className="match-list">
-          {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-            <div className="match-item" key={m.id}>
-              <div className="match-teams">
-                <span className="team-name">{m.ourTeam}</span>
-                <span className="versus">vs</span>
-                <span className="team-opponent">{m.opponent}</span>
-              </div>
-              <div className="match-game">{m.game}</div>
-              <div className="match-time">{m.time}</div>
+    <div className="min-h-screen bg-black text-white">
+    
+          <div className="grid grid-cols-3 items-center w-full px-4">
+    
+            <div className="justify-self-start">
+              <Header />
             </div>
-          ))}
-        </div>
-
-        <button
-          className="match-arrow"
-          onClick={nextMatches}
-          aria-label="Next matches"
-          disabled={matchStart >= matches.length - matchesToShow}
-        >
-          &rarr;
-        </button>
-      </div>
+    
+            <div className="justify-self-center">
+              <div className="match-bar inline-flex items-center">
+                <button onClick={prevMatches} disabled={matchStart === 0}>
+                  &larr;
+                </button>
+    
+                <div className="match-list">
+                  {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
+                    <div className="match-item" key={m.id}>
+                      <div className="match-teams">
+                        <span className="team-name">{m.ourTeam}</span>
+                        <span className="versus">vs</span>
+                        <span className="team-opponent">{m.opponent}</span>
+                      </div>
+                      <div className="match-game">{m.game}</div>
+                      <div className="match-time">{m.time}</div>
+                    </div>
+                  ))}
+                </div>
+    
+                <button
+                  onClick={nextMatches}
+                  disabled={matchStart >= matches.length - matchesToShow}
+                >
+                  &rarr;
+                </button>
+              </div>
+            </div>
+    
+            <div />
+    
+          </div>
 
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
 

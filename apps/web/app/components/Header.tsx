@@ -13,8 +13,7 @@ export default function Header() {
   return (
     <a
       href="https://goashlandeagles.com/"
-      className="text-white text-sm font-medium flex items-center gap-2 hover:text-gray-300 transition-colors"
-    >
+      className="text-white text-sm font-medium flex items-center hover:text-gray-300 transition-colors">
       <img src="/back.png" alt="back arrow" className="w-10 h-10" /> Back to Athletics
     </a>
   );

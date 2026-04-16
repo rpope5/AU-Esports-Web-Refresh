@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import Header from "./components/Header";
 
 function TwitterFeed() {
   const [tweets, setTweets] = useState<any[]>([]);
@@ -131,13 +132,29 @@ export default function Home() {
     "Hall of Fame": "/hof",
   };
 
-  const conferences = ["ECAC","GLEC","NECC","CKL","PlayVS","CCL"];
+  const conferences = ["ECAC", "GLEC", "NECC", "CKL", "PlayVS", "CCL"];
   const conferenceImages = [
-    "/ECAC.png","/GLEC.png","/NECC.jpg","/CKL.png","/PlayVS.jpg","/CCL.jpg",
+    "/ECAC.png",
+    "/GLEC.png",
+    "/NECC.png",
+    "/CKL.png",
+    "/PlayVS.jpg",
+    "/CCL.png",
   ];
 
-  const displayConferences = [...conferences, ...conferences, ...conferences, ...conferences];
-  const displayImages = [...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages];
+  const displayConferences = [
+    ...conferences,
+    ...conferences,
+    ...conferences,
+    ...conferences,
+  ];
+
+  const displayImages = [
+    ...conferenceImages,
+    ...conferenceImages,
+    ...conferenceImages,
+    ...conferenceImages,
+  ];
 
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
@@ -159,7 +176,9 @@ export default function Home() {
   useEffect(() => {
     const checkLiveStatus = async () => {
       try {
-        const res = await fetch("https://decapi.me/twitch/uptime/ashlandesports");
+        const res = await fetch(
+          "https://decapi.me/twitch/uptime/ashlandesports"
+        );
         const text = await res.text();
         setIsLive(!text.includes("offline"));
       } catch {
@@ -174,7 +193,9 @@ export default function Home() {
 
   useEffect(() => {
     const id = setInterval(() => {
-      setCurrentConfIndex((prevIndex) => (prevIndex + 1) % displayConferences.length);
+      setCurrentConfIndex(
+        (prevIndex) => (prevIndex + 1) % displayConferences.length
+      );
     }, 3000);
 
     return () => clearInterval(id);
@@ -184,6 +205,7 @@ export default function Home() {
   const matchesToShow = 5;
 
   const prevMatches = () => setMatchStart((s) => Math.max(0, s - 1));
+
   const nextMatches = () =>
     setMatchStart((s) =>
       Math.min(Math.max(0, matches.length - matchesToShow), s + 1)
@@ -192,29 +214,43 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-black text-white">
 
-      <div className="match-bar">
-        <button onClick={prevMatches} disabled={matchStart === 0}>&larr;</button>
+      <div className="grid grid-cols-3 items-center w-full px-4">
 
-        <div className="match-list">
-          {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-            <div className="match-item" key={m.id}>
-              <div className="match-teams">
-                <span className="team-name">{m.ourTeam}</span>
-                <span className="versus">vs</span>
-                <span className="team-opponent">{m.opponent}</span>
-              </div>
-              <div className="match-game">{m.game}</div>
-              <div className="match-time">{m.time}</div>
-            </div>
-          ))}
+        <div className="justify-self-start">
+          <Header />
         </div>
 
-        <button
-          onClick={nextMatches}
-          disabled={matchStart >= matches.length - matchesToShow}
-        >
-          &rarr;
-        </button>
+        <div className="justify-self-center">
+          <div className="match-bar inline-flex items-center">
+            <button onClick={prevMatches} disabled={matchStart === 0}>
+              &larr;
+            </button>
+
+            <div className="match-list">
+              {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
+                <div className="match-item" key={m.id}>
+                  <div className="match-teams">
+                    <span className="team-name">{m.ourTeam}</span>
+                    <span className="versus">vs</span>
+                    <span className="team-opponent">{m.opponent}</span>
+                  </div>
+                  <div className="match-game">{m.game}</div>
+                  <div className="match-time">{m.time}</div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={nextMatches}
+              disabled={matchStart >= matches.length - matchesToShow}
+            >
+              &rarr;
+            </button>
+          </div>
+        </div>
+
+        <div />
+
       </div>
 
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
@@ -229,10 +265,7 @@ export default function Home() {
           />
 
           <div className="flex items-center gap-3">
-            <h1
-              className="title title-3d text-lg md:text-2xl font-bold tracking-wide"
-              style={{ textShadow: "1px 1px #333" }}
-            >
+            <h1 className="title title-3d text-lg md:text-2xl font-bold tracking-wide">
               Ashland University Esports
             </h1>
 
@@ -276,7 +309,9 @@ export default function Home() {
               {displayConferences.map((conf, idx) => (
                 <div
                   key={`${conf}-${idx}`}
-                  onClick={() => setSelectedConf(conferences[idx % conferences.length])}
+                  onClick={() =>
+                    setSelectedConf(conferences[idx % conferences.length])
+                  }
                   className={`league-card h-48 ${selectedConf === conf ? "selected" : ""}`}
                 >
                   <span className="mb-3 text-black text-lg font-Gotham-Bold">
@@ -296,6 +331,7 @@ export default function Home() {
         </aside>
 
         <div className="main-content">
+
           <div className="video-container">
             <video
               src="/CS2.mp4"
@@ -325,6 +361,7 @@ export default function Home() {
                 <img src="/jersey.png" className="w-40" />
               </a>
             </div>
+
           </div>
         </div>
 
