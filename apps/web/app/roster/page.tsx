@@ -7,6 +7,7 @@ import RosterGrid from "@/components/RosterGrid";
 import Header from "../components/Header";
 
 export default function Home() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
 
   const pageMap: { [key: string]: string } = {
@@ -48,11 +49,11 @@ export default function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
 
 useEffect(() => {
-  fetch("http://localhost:8000/api/v1/roster")
+  fetch(`${apiUrl}/api/v1/roster`)
     .then((res) => res.json())
     .then((data) => setPlayers(data))
     .catch(() => console.error("Failed to load roster"));
-}, []);
+}, [apiUrl]);
 
 // Load matches
   useEffect(() => {

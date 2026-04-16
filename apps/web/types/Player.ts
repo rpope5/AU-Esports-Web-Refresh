@@ -1,9 +1,11 @@
 export interface Player {
+  id: number;
   name: string;
   gamertag: string;
   game: string;
-  rank: string;
-  year: string;
-  major: string;
-  headshot: string;
+  role: string | null;
+  rank: string | null;
+  year: string | null;
+  major: string | null;
+  headshot: string | null;
 }

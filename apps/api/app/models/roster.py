@@ -8,6 +8,7 @@ class Player(Base):
     name = Column(String, nullable=False)
     gamertag = Column(String, nullable=False)
     role = Column(String, nullable=True)
+    rank = Column(String, nullable=True)
     game = Column(String, nullable=False)
     year = Column(String, nullable=True)
     major = Column(String, nullable=True)
