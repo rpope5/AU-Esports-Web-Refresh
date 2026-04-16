@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
+import { getContentPlaceholder, resolveContentImageUrl } from "@/lib/contentImages";
 
 type AnnouncementState = "draft" | "pending_approval" | "published" | "rejected";
 
@@ -29,7 +30,7 @@ type Announcement = {
 type CreateWorkflowAction = "save_draft" | "submit_for_approval" | "publish";
 type UpdateWorkflowAction = CreateWorkflowAction | "reject";
 
-const DEFAULT_NEWS_PLACEHOLDER = "/images/esports-news-placeholder.jpg";
+const DEFAULT_NEWS_PLACEHOLDER = getContentPlaceholder("announcement");
 const ALL_GAME_OPTIONS = [
   { slug: "valorant", name: "Valorant" },
   { slug: "cs2", name: "Counter-Strike 2" },
@@ -44,11 +45,7 @@ const ALL_GAME_OPTIONS = [
 ];
 
 function resolveImageUrl(imageUrl: string | null, apiUrl: string): string {
-  if (!imageUrl || !imageUrl.trim()) return DEFAULT_NEWS_PLACEHOLDER;
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
-  if (imageUrl.startsWith("/uploads")) return `${apiUrl}${imageUrl}`;
-  if (imageUrl.startsWith("/")) return imageUrl;
-  return `${apiUrl}/${imageUrl}`;
+  return resolveContentImageUrl(imageUrl, apiUrl, "announcement");
 }
 
 function formatPostedDate(rawValue: string | null): string {
@@ -545,7 +542,7 @@ export default function AdminNewsPage() {
                 onChange={(e) => setImageFile(e.target.files?.[0] || null)}
               />
               <p className="mt-1 text-xs text-neutral-500">
-                If omitted, the frontend uses `/images/esports-news-placeholder.jpg`.
+                If omitted, the frontend uses `{DEFAULT_NEWS_PLACEHOLDER}`.
               </p>
             </div>
 

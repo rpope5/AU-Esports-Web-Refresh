@@ -1,18 +1,14 @@
 import { Player } from "@/types/Player";
+import { resolveContentImageUrl } from "@/lib/contentImages";
 
 interface RosterCardProps {
   player: Player;
 }
 
-const DEFAULT_HEADSHOT = "/images/esports-news-placeholder.jpg";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-function resolveImageUrl(imageUrl: string | null): string {
-  if (!imageUrl || !imageUrl.trim()) return DEFAULT_HEADSHOT;
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
-  if (imageUrl.startsWith("/uploads")) return `${API_URL}${imageUrl}`;
-  if (imageUrl.startsWith("/")) return imageUrl;
-  return `${API_URL}/${imageUrl}`;
+function resolveRosterHeadshot(imageUrl: string | null): string {
+  return resolveContentImageUrl(imageUrl, API_URL, "roster");
 }
 
 
@@ -20,7 +16,7 @@ export default function RosterCard({ player }: RosterCardProps) {
   return (
     <div className="bg-gray-900 rounded-xl p-4 shadow-lg flex flex-col items-center text-center border border-gray-700">
       <img
-        src={resolveImageUrl(player.headshot)}
+        src={resolveRosterHeadshot(player.headshot)}
         alt={player.name}
         className="w-32 h-32 rounded-full object-cover mb-4 border border-gray-600"
       />

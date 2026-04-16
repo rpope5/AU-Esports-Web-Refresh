@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session, aliased
@@ -13,6 +12,7 @@ from app.core.deps import (
     require_announcement_deleter,
     require_announcement_manager,
 )
+from app.core.uploads import ImageUploadConfig, delete_uploaded_image, save_uploaded_image
 from app.models.admin_user import AdminUser
 from app.models.announcement import EsportsAnnouncement
 from app.models.game import Game
@@ -26,93 +26,23 @@ from app.schemas.announcement import (
 router = APIRouter()
 
 API_ROOT = Path(__file__).resolve().parents[3]
-NEWS_UPLOAD_DIR = API_ROOT / "uploads" / "news"
-MAX_UPLOAD_BYTES = int(os.getenv("NEWS_IMAGE_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
-ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-CONTENT_TYPE_TO_EXTENSION = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-}
+NEWS_IMAGE_UPLOAD = ImageUploadConfig(
+    upload_dir=API_ROOT / "uploads" / "news",
+    public_prefix="/uploads/news",
+    max_upload_bytes=int(os.getenv("NEWS_IMAGE_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
+    non_image_error_detail="Uploaded file must be an image",
+    file_size_subject="Image",
+)
 ANNOUNCEMENT_STATES: set[str] = {"draft", "pending_approval", "published", "rejected"}
 PUBLISHER_ROLES = {"coach", "head_coach", "admin"}
 
 
-def _parse_image_extension(upload: UploadFile) -> str:
-    content_type = (upload.content_type or "").lower().strip()
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Uploaded file must be an image")
-
-    ext = Path(upload.filename or "").suffix.lower().strip()
-    if ext in ALLOWED_IMAGE_EXTENSIONS:
-        return ext
-
-    fallback_ext = CONTENT_TYPE_TO_EXTENSION.get(content_type)
-    if fallback_ext:
-        return fallback_ext
-
-    allowed_list = ", ".join(sorted(ALLOWED_IMAGE_EXTENSIONS))
-    raise HTTPException(
-        status_code=400,
-        detail=f"Unsupported image type. Allowed extensions: {allowed_list}",
-    )
-
-
 def _save_uploaded_image(upload: UploadFile) -> str:
-    ext = _parse_image_extension(upload)
-    NEWS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-    filename = f"{uuid4().hex}{ext}"
-    destination = NEWS_UPLOAD_DIR / filename
-
-    total_written = 0
-    try:
-        with destination.open("wb") as output:
-            while True:
-                chunk = upload.file.read(1024 * 1024)
-                if not chunk:
-                    break
-                total_written += len(chunk)
-                if total_written > MAX_UPLOAD_BYTES:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"Image exceeds max size of {MAX_UPLOAD_BYTES} bytes",
-                    )
-                output.write(chunk)
-    except HTTPException:
-        destination.unlink(missing_ok=True)
-        raise
-    finally:
-        upload.file.close()
-
-    return f"/uploads/news/{filename}"
+    return save_uploaded_image(upload, NEWS_IMAGE_UPLOAD)
 
 
 def _delete_uploaded_image(image_path: str | None) -> bool:
-    if not image_path:
-        return False
-
-    normalized = image_path.strip()
-    if not normalized.startswith("/uploads/news/"):
-        return False
-
-    news_dir_resolved = NEWS_UPLOAD_DIR.resolve()
-    candidate = (API_ROOT / normalized.lstrip("/")).resolve()
-
-    try:
-        candidate.relative_to(news_dir_resolved)
-    except ValueError:
-        return False
-
-    if not candidate.exists() or not candidate.is_file():
-        return False
-
-    try:
-        candidate.unlink()
-        return True
-    except OSError:
-        return False
+    return delete_uploaded_image(image_path, NEWS_IMAGE_UPLOAD)
 
 
 def _normalize_state(raw_state: str | None) -> AnnouncementState:
