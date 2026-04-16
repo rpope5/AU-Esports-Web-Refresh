@@ -14,6 +14,7 @@ type FormState = {
   discord: string;
   current_school: string;
   graduation_year: string;
+  custom_graduation_year: string;
   preferred_contact: string;
   hours_per_week: string;
   weeknights_available: boolean;
@@ -64,7 +65,11 @@ type Match = {
   time: string;
 };
 
-const graduationYears = Array.from({ length: 7 }, (_, i) => String(new Date().getFullYear() + i));
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_CUSTOM_GRADUATION_YEAR = CURRENT_YEAR - 40;
+const MAX_CUSTOM_GRADUATION_YEAR = CURRENT_YEAR - 1;
+const GRADUATION_YEAR_OTHER = "other";
+const graduationYears = Array.from({ length: 7 }, (_, i) => String(CURRENT_YEAR + i));
 
 const pages = [
   "Home",
@@ -384,6 +389,7 @@ export default function RecruitPage() {
     discord: "",
     current_school: "",
     graduation_year: "",
+    custom_graduation_year: "",
     preferred_contact: "discord",
     hours_per_week: "",
     weeknights_available: true,
@@ -452,6 +458,15 @@ export default function RecruitPage() {
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateGraduationYear(value: string) {
+    setForm((prev) => ({
+      ...prev,
+      graduation_year: value,
+      custom_graduation_year:
+        value === GRADUATION_YEAR_OTHER ? prev.custom_graduation_year : "",
+    }));
   }
 
   function updateTournamentExperience(value: string) {
@@ -597,15 +612,41 @@ export default function RecruitPage() {
     setLoading(true);
 
     try {
+      let resolvedGraduationYear: number | null = null;
+      if (form.graduation_year === GRADUATION_YEAR_OTHER) {
+        const customYearText = form.custom_graduation_year.trim();
+        if (!customYearText) {
+          throw new Error("Please enter your graduation year.");
+        }
+        if (!/^\d{4}$/.test(customYearText)) {
+          throw new Error("Custom graduation year must be a valid 4-digit year.");
+        }
+        const customYear = Number(customYearText);
+        if (customYear < MIN_CUSTOM_GRADUATION_YEAR) {
+          throw new Error(
+            `Custom graduation year must be ${MIN_CUSTOM_GRADUATION_YEAR} or later.`,
+          );
+        }
+        if (customYear > MAX_CUSTOM_GRADUATION_YEAR) {
+          throw new Error(
+            `Custom graduation year must be ${MAX_CUSTOM_GRADUATION_YEAR} or earlier.`,
+          );
+        }
+        resolvedGraduationYear = customYear;
+      } else if (form.graduation_year) {
+        if (!graduationYears.includes(form.graduation_year)) {
+          throw new Error("Please select a valid graduation year.");
+        }
+        resolvedGraduationYear = Number(form.graduation_year);
+      }
+
       const payload = {
         first_name: form.first_name,
         last_name: form.last_name,
         email: form.email,
         discord: form.discord,
         current_school: form.current_school || null,
-        graduation_year: form.graduation_year
-          ? Number(form.graduation_year)
-          : null,
+        graduation_year: resolvedGraduationYear,
         preferred_contact: form.preferred_contact || null,
         availability: {
           hours_per_week: Number(form.hours_per_week),
@@ -718,6 +759,7 @@ export default function RecruitPage() {
         discord: "",
         current_school: "",
         graduation_year: "",
+        custom_graduation_year: "",
         preferred_contact: "discord",
         hours_per_week: "",
         weeknights_available: true,
@@ -918,7 +960,7 @@ const [isLive, setIsLive] = useState(false);
                 <select
                   className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                   value={form.graduation_year}
-                  onChange={(e) => update("graduation_year", e.target.value)}
+                  onChange={(e) => updateGraduationYear(e.target.value)}
                 >
                   <option value="">Select graduation year</option>
                   {graduationYears.map((year) => (
@@ -926,7 +968,24 @@ const [isLive, setIsLive] = useState(false);
                       {year}
                     </option>
                   ))}
+                  <option value={GRADUATION_YEAR_OTHER}>Other</option>
                 </select>
+                {form.graduation_year === GRADUATION_YEAR_OTHER && (
+                  <div className="mt-3">
+                    <label className="text-sm font-medium text-[#FFC72C]">Other Graduation Year</label>
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      value={form.custom_graduation_year}
+                      onChange={(e) => update("custom_graduation_year", e.target.value)}
+                      placeholder={`Enter 4-digit year `}
+                      inputMode="numeric"
+                      pattern="[0-9]{4}"
+                      maxLength={4}
+                      required
+                    />
+                  
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-[#FFC72C]">

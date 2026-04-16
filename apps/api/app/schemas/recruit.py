@@ -4,6 +4,12 @@ from datetime import datetime
 
 
 CURRENT_YEAR = datetime.now().year
+MIN_GRADUATION_YEAR = CURRENT_YEAR - 40
+MAX_CUSTOM_GRADUATION_YEAR = CURRENT_YEAR - 1
+MIN_PRESET_GRADUATION_YEAR = CURRENT_YEAR
+MAX_PRESET_GRADUATION_YEAR = CURRENT_YEAR + 6
+MIN_FOUR_DIGIT_YEAR = 1000
+MAX_FOUR_DIGIT_YEAR = 9999
 TOURNAMENT_EXPERIENCE_WITH_DETAILS = {"local", "regional", "national"}
 
 
@@ -93,8 +99,20 @@ class RecruitApplyInput(BaseModel):
     def validate_graduation_year(cls, v):
         if v is None:
             return v
-        if v < CURRENT_YEAR or v > CURRENT_YEAR + 6:
-            raise ValueError(f"graduation_year must be between {CURRENT_YEAR} and {CURRENT_YEAR + 6}")
+        if v < MIN_FOUR_DIGIT_YEAR or v > MAX_FOUR_DIGIT_YEAR:
+            raise ValueError("graduation_year must be a valid 4-digit year")
+
+        in_custom_range = MIN_GRADUATION_YEAR <= v <= MAX_CUSTOM_GRADUATION_YEAR
+        in_preset_range = MIN_PRESET_GRADUATION_YEAR <= v <= MAX_PRESET_GRADUATION_YEAR
+        if not in_custom_range and not in_preset_range:
+            raise ValueError(
+                (
+                    "graduation_year must be within the custom range "
+                    f"({MIN_GRADUATION_YEAR}-{MAX_CUSTOM_GRADUATION_YEAR}) "
+                    "or preset range "
+                    f"({MIN_PRESET_GRADUATION_YEAR}-{MAX_PRESET_GRADUATION_YEAR})"
+                )
+            )
         return v
     
     @model_validator(mode="after")
