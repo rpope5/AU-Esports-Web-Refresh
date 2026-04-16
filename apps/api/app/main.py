@@ -43,7 +43,15 @@ if auto_create_tables:
     Base.metadata.create_all(bind=engine)
 
 # CORS
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")]
+default_cors_origins = ",".join(
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://localhost:3000",
+        "https://127.0.0.1:3000",
+    ]
+)
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS", default_cors_origins).split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
