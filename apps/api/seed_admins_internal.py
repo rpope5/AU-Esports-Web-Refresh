@@ -17,7 +17,7 @@ def seed():
         user = AdminUser(
             username=username,
             email=None,
-            role="ADMIN",
+            role="admin",
             password_hash=hash_password(password),
         )
 

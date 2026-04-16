@@ -1,20 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.db.session import SessionLocal
+from app.core.deps import build_staff_principal, get_db
 from app.models.admin_user import AdminUser
 from app.schemas.auth_internal import LoginRequest, AuthResponse
 from app.core.passwords import verify_password
 from app.core.jwt_auth import create_access_token
 
 router = APIRouter()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("/auth/login", response_model=AuthResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
@@ -27,5 +20,14 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token({"sub": user.username, "role": user.role})
-    return AuthResponse(access_token=token, role=user.role, username=user.username)
+    staff = build_staff_principal(db, user)
+    token = create_access_token({"sub": user.username, "role": staff.role})
+
+    return AuthResponse(
+        access_token=token,
+        role=staff.role,
+        username=user.username,
+        allowed_game_slugs=sorted(staff.allowed_game_slugs),
+        has_global_game_access=staff.has_global_game_access,
+        permissions=staff.permissions.to_dict(),
+    )
