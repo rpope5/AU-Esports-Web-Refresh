@@ -8,6 +8,9 @@ PermissionName = Literal[
     "can_view_recruits",
     "can_manage_recruits",
     "can_delete_recruits",
+    "can_view_roster",
+    "can_manage_roster",
+    "can_delete_roster",
     "can_manage_announcements",
     "can_delete_announcements",
     "can_manage_schedule",
@@ -24,6 +27,9 @@ class StaffPermissions:
     can_view_recruits: bool
     can_manage_recruits: bool
     can_delete_recruits: bool
+    can_view_roster: bool
+    can_manage_roster: bool
+    can_delete_roster: bool
     can_manage_announcements: bool
     can_delete_announcements: bool
     can_manage_schedule: bool
@@ -39,6 +45,9 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_view_recruits=True,
         can_manage_recruits=False,
         can_delete_recruits=False,
+        can_view_roster=True,
+        can_manage_roster=False,
+        can_delete_roster=False,
         can_manage_announcements=True,
         can_delete_announcements=False,
         can_manage_schedule=True,
@@ -49,6 +58,9 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_view_recruits=True,
         can_manage_recruits=True,
         can_delete_recruits=False,
+        can_view_roster=True,
+        can_manage_roster=True,
+        can_delete_roster=False,
         can_manage_announcements=True,
         can_delete_announcements=False,
         can_manage_schedule=True,
@@ -59,6 +71,9 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_view_recruits=True,
         can_manage_recruits=True,
         can_delete_recruits=True,
+        can_view_roster=True,
+        can_manage_roster=True,
+        can_delete_roster=True,
         can_manage_announcements=True,
         can_delete_announcements=True,
         can_manage_schedule=True,
@@ -69,6 +84,9 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_view_recruits=True,
         can_manage_recruits=True,
         can_delete_recruits=True,
+        can_view_roster=True,
+        can_manage_roster=True,
+        can_delete_roster=True,
         can_manage_announcements=True,
         can_delete_announcements=True,
         can_manage_schedule=True,

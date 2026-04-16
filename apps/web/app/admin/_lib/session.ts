@@ -2,6 +2,9 @@ export type AdminPermissionKey =
   | "can_view_recruits"
   | "can_manage_recruits"
   | "can_delete_recruits"
+  | "can_view_roster"
+  | "can_manage_roster"
+  | "can_delete_roster"
   | "can_manage_announcements"
   | "can_delete_announcements"
   | "can_manage_schedule"
@@ -22,6 +25,9 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   can_view_recruits: false,
   can_manage_recruits: false,
   can_delete_recruits: false,
+  can_view_roster: false,
+  can_manage_roster: false,
+  can_delete_roster: false,
   can_manage_announcements: false,
   can_delete_announcements: false,
   can_manage_schedule: false,
@@ -34,6 +40,9 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_view_recruits: true,
     can_manage_recruits: false,
     can_delete_recruits: false,
+    can_view_roster: true,
+    can_manage_roster: false,
+    can_delete_roster: false,
     can_manage_announcements: true,
     can_delete_announcements: false,
     can_manage_schedule: true,
@@ -44,6 +53,9 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_view_recruits: true,
     can_manage_recruits: true,
     can_delete_recruits: false,
+    can_view_roster: true,
+    can_manage_roster: true,
+    can_delete_roster: false,
     can_manage_announcements: true,
     can_delete_announcements: false,
     can_manage_schedule: true,
@@ -54,6 +66,9 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_view_recruits: true,
     can_manage_recruits: true,
     can_delete_recruits: true,
+    can_view_roster: true,
+    can_manage_roster: true,
+    can_delete_roster: true,
     can_manage_announcements: true,
     can_delete_announcements: true,
     can_manage_schedule: true,
@@ -64,6 +79,9 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_view_recruits: true,
     can_manage_recruits: true,
     can_delete_recruits: true,
+    can_view_roster: true,
+    can_manage_roster: true,
+    can_delete_roster: true,
     can_manage_announcements: true,
     can_delete_announcements: true,
     can_manage_schedule: true,
@@ -91,6 +109,9 @@ function parsePermissions(raw: unknown, role: string): AdminPermissions {
     can_view_recruits: Boolean((raw as Partial<AdminPermissions>).can_view_recruits ?? roleDefaults.can_view_recruits),
     can_manage_recruits: Boolean((raw as Partial<AdminPermissions>).can_manage_recruits ?? roleDefaults.can_manage_recruits),
     can_delete_recruits: Boolean((raw as Partial<AdminPermissions>).can_delete_recruits ?? roleDefaults.can_delete_recruits),
+    can_view_roster: Boolean((raw as Partial<AdminPermissions>).can_view_roster ?? roleDefaults.can_view_roster),
+    can_manage_roster: Boolean((raw as Partial<AdminPermissions>).can_manage_roster ?? roleDefaults.can_manage_roster),
+    can_delete_roster: Boolean((raw as Partial<AdminPermissions>).can_delete_roster ?? roleDefaults.can_delete_roster),
     can_manage_announcements: Boolean(
       (raw as Partial<AdminPermissions>).can_manage_announcements ?? roleDefaults.can_manage_announcements,
     ),

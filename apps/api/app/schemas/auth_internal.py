@@ -10,6 +10,9 @@ class PermissionPayload(BaseModel):
     can_view_recruits: bool
     can_manage_recruits: bool
     can_delete_recruits: bool
+    can_view_roster: bool
+    can_manage_roster: bool
+    can_delete_roster: bool
     can_manage_announcements: bool
     can_delete_announcements: bool
     can_manage_schedule: bool
