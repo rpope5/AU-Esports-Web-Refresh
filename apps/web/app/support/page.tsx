@@ -241,7 +241,7 @@ export default function Home() {
 
     <div className="pointer-events-auto bg-[#5C068C] rounded-xl p-6 flex flex-col items-center justify-center text-center h-full">
       <p className="text-white text-lg md:text-xl font-semibold">
-        Support Ashland Esports<br />
+        Support Ashland Esports!<br />
         With the Ashland University Day of Giving<br />
         you can help us grow our program, support our players, and compete at the highest level.
       </p>
