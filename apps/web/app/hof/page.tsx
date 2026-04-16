@@ -259,7 +259,7 @@ useEffect(() => {
               <p className="text-sm text-white-700">Championship Team</p>
             </div>
             <div className="mb-4">
-              <Image src="/images/overwatch-logo.png" alt="Trohpy" width={150} height={150} className="rounded-lg mx-auto" />
+              <Image src="/images/overwatch-logo.png" alt="Trophy" width={150} height={150} className="rounded-lg mx-auto" />
             </div>
             <p className="text-white text-lg font-semibold">Championship Year: 2025</p>
           </div>
@@ -271,7 +271,7 @@ useEffect(() => {
               <p className="text-sm text-gray-700">Championship Team</p>
             </div>
             <div className="mb-4">
-              <Image src="/images/rocket-league-logo.png" alt="Trohpy" width={150} height={150} className="rounded-lg mx-auto" />
+              <Image src="/images/rocket-league-logo.png" alt="Trophy" width={150} height={150} className="rounded-lg mx-auto" />
             </div>
             <p className="text-black text-lg font-semibold">Championship Year: 2025</p>
           </div>

@@ -916,7 +916,7 @@ const [isLive, setIsLive] = useState(false);
               <div>
                 <label className="text-sm font-medium text-[#FFC72C]">Graduation Year</label>
                 <select
-                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                   value={form.graduation_year}
                   onChange={(e) => update("graduation_year", e.target.value)}
                 >
@@ -933,7 +933,7 @@ const [isLive, setIsLive] = useState(false);
                   Preferred Contact
                 </label>
                 <select
-                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                  className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                   value={form.preferred_contact}
                   onChange={(e) => update("preferred_contact", e.target.value)}
                 >
@@ -990,7 +990,7 @@ const [isLive, setIsLive] = useState(false);
             <div className="mt-4">
               <label className="text-sm font-medium text-[#FFC72C]">Game</label>
               <select
-                className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                 value={form.game_slug}
                 onChange={(e) =>
                   resetGameFields(e.target.value as GameSlug)
@@ -1040,7 +1040,7 @@ const [isLive, setIsLive] = useState(false);
                 <div>
                   <label className="text-sm font-medium text-[#FFC72C]">Preferred Format</label>
                   <input
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value="Standard"
                     disabled
                   />
@@ -1073,7 +1073,7 @@ const [isLive, setIsLive] = useState(false);
                 <div>
                   <label className="text-sm font-medium text-[#FFC72C]">Preferred Title</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.preferred_title}
                     onChange={(e) => update("preferred_title", e.target.value)}
                   >
@@ -1089,7 +1089,7 @@ const [isLive, setIsLive] = useState(false);
                 <div>
                   <label className="text-sm font-medium text-[#FFC72C]">Controller Type</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.controller_type}
                     onChange={(e) => update("controller_type", e.target.value)}
                   >
@@ -1105,7 +1105,7 @@ const [isLive, setIsLive] = useState(false);
                 <div>
                   <label className="text-sm font-medium text-[#FFC72C]">Playstyle</label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                   className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.playstyle}
                     onChange={(e) => {
                       update("playstyle", e.target.value);
@@ -1191,7 +1191,7 @@ const [isLive, setIsLive] = useState(false);
                     Tournament Experience
                   </label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                   className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
                     onChange={(e) => updateTournamentExperience(e.target.value)}
                   >
@@ -1209,7 +1209,7 @@ const [isLive, setIsLive] = useState(false);
                         Explain your tournament experience
                       </label>
                       <textarea
-                        className="mt-1 min-h-[120px] w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                        className="mt-1 min-h-[120px] w-full rounded-lg border border-[#FFC72C]/30 bg-black p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                         value={form.tournament_experience_details}
                         onChange={(e) =>
                           update("tournament_experience_details", e.target.value)
@@ -1254,7 +1254,7 @@ const [isLive, setIsLive] = useState(false);
                   <div>
                     <label className="text-sm font-medium text-[#FFC72C]">Fortnite Mode</label>
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                     className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.fortnite_mode}
                       onChange={(e) => update("fortnite_mode", e.target.value)}
                       required
@@ -1321,7 +1321,7 @@ const [isLive, setIsLive] = useState(false);
 
                   {form.game_slug === "valorant" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                     className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) =>
                         update("current_rank_label", e.target.value)
@@ -1337,7 +1337,7 @@ const [isLive, setIsLive] = useState(false);
                     </select>
                   ) : form.game_slug === "fortnite" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1351,7 +1351,7 @@ const [isLive, setIsLive] = useState(false);
                     </select>
                   ) : form.game_slug === "r6" ? (
                     <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                   className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
@@ -1366,7 +1366,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "rocket-league" ? (
                     <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.current_rank_label}
                     onChange={(e) => update("current_rank_label", e.target.value)}
                     required
@@ -1381,7 +1381,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "overwatch" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                     className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1396,7 +1396,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "cod" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1411,7 +1411,7 @@ const [isLive, setIsLive] = useState(false);
 
                   ) : form.game_slug === "hearthstone" ? (
                     <select
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                       onChange={(e) => update("current_rank_label", e.target.value)}
                       required
@@ -1427,7 +1427,7 @@ const [isLive, setIsLive] = useState(false);
                   ) : (
                     <>
                     <input
-                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                      className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                       value={form.current_rank_label}
                         onChange={(e) =>
                           update("current_rank_label", e.target.value)
@@ -1481,7 +1481,7 @@ const [isLive, setIsLive] = useState(false);
                     <div>
                       <label className="text-sm font-medium text-[#FFC72C]">Primary Role</label>
                       <select
-                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                         value={form.primary_role}
                         onChange={(e) => update("primary_role", e.target.value)}
                         required
@@ -1500,7 +1500,7 @@ const [isLive, setIsLive] = useState(false);
                         Secondary Role
                       </label>
                       <select
-                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                         value={form.secondary_role}
                         onChange={(e) => update("secondary_role", e.target.value)}
                       >
@@ -1526,7 +1526,7 @@ const [isLive, setIsLive] = useState(false);
                     Tournament Experience
                   </label>
                   <select
-                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+                    className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black text-white p-3 appearance-none focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
                     value={form.tournament_experience}
                     onChange={(e) => updateTournamentExperience(e.target.value)}
                   >
@@ -1613,7 +1613,7 @@ function Input({
     <div>
       <label className="text-sm font-medium text-[#FFC72C]">{label}</label>
       <input
-        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-neutral-900/50 p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
+        className="mt-1 w-full rounded-lg border border-[#FFC72C]/30 bg-black p-3 text-white placeholder-neutral-500 focus:border-[#FFC72C]/80 focus:outline-none focus:ring-1 focus:ring-[#FFC72C]/50 transition-colors"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
