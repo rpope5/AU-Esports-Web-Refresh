@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Header from "../components/Header";
+import { getContentPlaceholder, resolveContentImageUrl } from "@/lib/contentImages";
 
 type Match = {
   id: number;
@@ -22,14 +23,10 @@ type Announcement = {
   updated_at: string | null;
 };
 
-const DEFAULT_NEWS_PLACEHOLDER = "/images/esports-news-placeholder.jpg";
+const DEFAULT_NEWS_PLACEHOLDER = getContentPlaceholder("announcement");
 
 function resolveAnnouncementImage(imageUrl: string | null, apiUrl: string): string {
-  if (!imageUrl || !imageUrl.trim()) return DEFAULT_NEWS_PLACEHOLDER;
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
-  if (imageUrl.startsWith("/uploads")) return `${apiUrl}${imageUrl}`;
-  if (imageUrl.startsWith("/")) return imageUrl;
-  return `${apiUrl}/${imageUrl}`;
+  return resolveContentImageUrl(imageUrl, apiUrl, "announcement");
 }
 
 function formatPostedDate(rawValue: string): string {

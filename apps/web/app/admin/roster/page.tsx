@@ -429,7 +429,7 @@ export default function AdminRosterPage() {
               onChange={(event) => setCreateHeadshot(event.target.files?.[0] || null)}
             />
             <p className="mt-1 text-xs text-neutral-500">
-              Upload uses the same `/uploads` pipeline style as announcements.
+              Uploaded headshots are stored under `/uploads/roster`, separate from announcement images.
             </p>
           </div>
 

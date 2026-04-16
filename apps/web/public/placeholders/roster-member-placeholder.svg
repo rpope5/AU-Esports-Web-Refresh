@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Roster Member Placeholder</title>
+  <desc id="desc">Neutral placeholder used when a roster member headshot is missing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1730" />
+      <stop offset="100%" stop-color="#143560" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3e6c" />
+      <stop offset="100%" stop-color="#2e5f9f" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)" />
+  <circle cx="256" cy="256" r="180" fill="#0a1f3f" stroke="url(#ring)" stroke-width="8" />
+  <circle cx="256" cy="220" r="58" fill="#355f94" />
+  <path d="M156 334c0-55 45-100 100-100s100 45 100 100v14H156z" fill="#355f94" />
+  <text x="256" y="442" text-anchor="middle" font-size="30" font-family="Arial, sans-serif" fill="#e7edf8">
+    AU ROSTER
+  </text>
+</svg>
