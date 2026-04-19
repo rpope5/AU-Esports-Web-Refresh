@@ -78,7 +78,7 @@ PERMISSIONS_BY_ROLE: dict[StaffRole, StaffPermissions] = {
         can_delete_announcements=True,
         can_manage_schedule=True,
         can_delete_schedule=True,
-        can_manage_users=False,
+        can_manage_users=True,
     ),
     "admin": StaffPermissions(
         can_view_recruits=True,

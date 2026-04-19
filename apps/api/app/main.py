@@ -16,6 +16,7 @@ from app.v1.endpoints import recruits_admin
 from app.v1.endpoints import recruits_public
 from app.v1.endpoints import roster
 from app.v1.endpoints import schedule
+from app.v1.endpoints import users
 
 settings = get_settings()
 logging.basicConfig(
@@ -33,6 +34,7 @@ app.include_router(recruits_admin.router, prefix="/api/v1")
 app.include_router(announcements.router, prefix="/api/v1")
 app.include_router(schedule.router, prefix="/api/v1")
 app.include_router(roster.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
 if settings.auto_create_tables:
