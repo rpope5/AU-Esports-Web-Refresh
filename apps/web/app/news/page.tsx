@@ -3,16 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Header from "../components/Header";
+import TopActivityFeedBar from "../components/TopActivityFeedBar";
 import { getContentPlaceholder, resolveContentImageUrl } from "@/lib/contentImages";
-
-type Match = {
-  id: number;
-  ourTeam: string;
-  opponent: string;
-  game: string;
-  time: string;
-};
 
 type Announcement = {
   id: number;
@@ -55,100 +47,12 @@ export default function NewsPage() {
     "Hall of Fame": "/hof",
   };
 
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [matchStart, setMatchStart] = useState(0);
-  const matchesToShow = 5;
   const [isLive, setIsLive] = useState(false);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loadingNews, setLoadingNews] = useState(true);
   const [newsError, setNewsError] = useState<string | null>(null);
   const [expandedAnnouncementIds, setExpandedAnnouncementIds] = useState<Record<number, boolean>>({});
-
-  useEffect(() => {
-    const tryLoadMatches = async () => {
-      try {
-        const resX = await fetch("/data/matches.xlsx");
-        if (resX.ok) {
-          const buffer = await resX.arrayBuffer();
-          const XLSX = await import("xlsx").catch(() => null);
-          if (!XLSX) throw new Error("xlsx not available");
-          const wb = XLSX.read(buffer, { type: "array" });
-          const sheetName = wb.SheetNames[0];
-          const ws = wb.Sheets[sheetName];
-          const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
-          if (Array.isArray(raw) && raw.length) {
-            const pickString = (
-              row: Record<string, unknown>,
-              ...keys: string[]
-            ): string | undefined => {
-              for (const key of keys) {
-                const value = row[key];
-                if (typeof value === "string" && value.trim()) return value;
-              }
-              return undefined;
-            };
-
-            const parsed: Match[] = raw.map((row, index) => {
-              const record = row as Record<string, unknown>;
-              return {
-                id: Number(record.id) || index + 1,
-                ourTeam: pickString(record, "ourTeam", "OurTeam", "Team") || "Ashland",
-                opponent: pickString(record, "opponent", "Opponent", "Opp") || "",
-                game: pickString(record, "game", "Game", "Platform") || "",
-                time: pickString(record, "time", "Time", "datetime") || "",
-              };
-            });
-            setMatches(parsed);
-            return;
-          }
-        }
-      } catch {
-        // Best-effort data loading. Falls through to CSV/JSON.
-      }
-
-      try {
-        const resC = await fetch("/data/matches.csv");
-        if (resC.ok) {
-          const txt = await resC.text();
-          const rows = txt.trim().split("\n").map((row) => row.split(","));
-          const headers = rows.shift() || [];
-          const parsed: Match[] = rows.map((cols, index) => {
-            const obj: Record<string, string> = {};
-            headers.forEach((header, headerIndex) => {
-              obj[header.trim()] = cols[headerIndex] ? cols[headerIndex].trim() : "";
-            });
-            return {
-              id: Number(obj.id) || index + 1,
-              ourTeam: obj.ourTeam || obj.OurTeam || "Ashland",
-              opponent: obj.opponent || obj.Opponent || "",
-              game: obj.game || obj.Game || "",
-              time: obj.time || obj.Time || "",
-            };
-          });
-          if (parsed.length) {
-            setMatches(parsed);
-            return;
-          }
-        }
-      } catch {
-        // Best-effort data loading. Falls through to JSON.
-      }
-
-      try {
-        const response = await fetch("/data/matches.json");
-        if (!response.ok) throw new Error("Failed to load JSON matches");
-        const data = await response.json();
-        if (Array.isArray(data) && data.length) {
-          setMatches(data as Match[]);
-        }
-      } catch {
-        setMatches([]);
-      }
-    };
-
-    tryLoadMatches();
-  }, []);
 
   useEffect(() => {
     const checkLiveStatus = async () => {
@@ -197,51 +101,9 @@ export default function NewsPage() {
     }));
   };
 
-  const prevMatches = () => setMatchStart((current) => Math.max(0, current - 1));
-  const nextMatches = () =>
-    setMatchStart((current) => Math.min(Math.max(0, matches.length - matchesToShow), current + 1));
-
   return (
     <div className="min-h-screen bg-black text-white">
-    
-          <div className="grid grid-cols-3 items-center w-full px-4">
-    
-            <div className="justify-self-start">
-              <Header />
-            </div>
-    
-            <div className="justify-self-center">
-              <div className="match-bar inline-flex items-center">
-                <button onClick={prevMatches} disabled={matchStart === 0}>
-                  &larr;
-                </button>
-    
-                <div className="match-list">
-                  {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-                    <div className="match-item" key={m.id}>
-                      <div className="match-teams">
-                        <span className="team-name">{m.ourTeam}</span>
-                        <span className="versus">vs</span>
-                        <span className="team-opponent">{m.opponent}</span>
-                      </div>
-                      <div className="match-game">{m.game}</div>
-                      <div className="match-time">{m.time}</div>
-                    </div>
-                  ))}
-                </div>
-    
-                <button
-                  onClick={nextMatches}
-                  disabled={matchStart >= matches.length - matchesToShow}
-                >
-                  &rarr;
-                </button>
-              </div>
-            </div>
-    
-            <div />
-    
-          </div>
+      <TopActivityFeedBar />
 
       <header className="site-header flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
         <div className="flex items-center gap-2">
