@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <rect width="120" height="120" rx="12" fill="#081122"/>
+  <circle cx="60" cy="44" r="28" fill="#7c3aed" />
+  <text x="60" y="78" font-size="22" font-family="Arial, Helvetica, sans-serif" fill="#fff" text-anchor="middle">PlayVS</text>
+</svg>

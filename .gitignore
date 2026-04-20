@@ -6,6 +6,44 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# env files
+.env
+.env.*
+!.env.example
+
+# sqlite
+*.db
+*.sqlite
+*.sqlite3
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+apps/api/dev.db
+apps/api/uploads/**
+!apps/api/uploads/
+!apps/api/uploads/news/
+!apps/api/uploads/roster/
+!apps/api/uploads/.gitkeep
+!apps/api/uploads/roster/.gitkeep
+!apps/api/uploads/news/.gitkeep
+# node / next
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 

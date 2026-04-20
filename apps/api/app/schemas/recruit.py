@@ -1,0 +1,131 @@
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
+from typing import Optional, Literal
+from datetime import datetime
+
+
+CURRENT_YEAR = datetime.now().year
+MIN_GRADUATION_YEAR = CURRENT_YEAR - 40
+MAX_CUSTOM_GRADUATION_YEAR = CURRENT_YEAR - 1
+MIN_PRESET_GRADUATION_YEAR = CURRENT_YEAR
+MAX_PRESET_GRADUATION_YEAR = CURRENT_YEAR + 6
+MIN_FOUR_DIGIT_YEAR = 1000
+MAX_FOUR_DIGIT_YEAR = 9999
+TOURNAMENT_EXPERIENCE_WITH_DETAILS = {"local", "regional", "national"}
+
+
+class AvailabilityInput(BaseModel):
+    hours_per_week: int = Field(..., ge=1, le=40)
+    weeknights_available: bool
+    weekends_available: bool
+
+
+class RecruitProfileInput(BaseModel):
+    ign: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    current_rank_label:Optional[str] = Field(default=None, min_length=1, max_length=50)
+    peak_rank_label: Optional[str] = Field(default=None, max_length=50)
+    primary_role: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    secondary_role: Optional[str] = Field(default=None, max_length=100)
+    tracker_url: Optional[str] = Field(default=None, max_length=255)
+    team_experience: bool
+    scrim_experience: bool
+    tournament_experience: Literal["none", "local", "regional", "national"]
+    tournament_experience_details: Optional[str] = Field(default=None, max_length=2000)
+    fortnite_mode: str | None = None
+    epic_games_name: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    fortnite_pr: Optional[int] = Field(default=None, ge=0, le=1000000)
+    fortnite_kd: Optional[float] = Field(default=None, ge=0, le=100)
+    fortnite_total_kills: Optional[int] = Field(default=None, ge=0, le=10000000)
+    fortnite_playtime_hours: Optional[float] = Field(default=None, ge=0, le=100000)
+    fortnite_wins: Optional[int] = Field(default=None, ge=0, le=100000)
+    faceit_level: Optional[int] = Field(default=None, ge=1, le=10)
+    faceit_elo: Optional[int] = Field(default=None, ge=0, le=5000)
+    cs2_roles: Optional[str] = Field(default=None, max_length=255)
+    prior_team_history: Optional[str] = Field(default=None, max_length=500)
+
+    ranked_wins: Optional[int] = Field(default=None, ge=0, le=50000)
+    years_played: Optional[int] = Field(default=None, ge=0, le=30)
+    legend_peak_rank: Optional[int] = Field(default=None, ge=1, le=50000)
+    preferred_format: Optional[str] = Field(default=None, max_length=50)
+    other_card_games: Optional[str] = Field(default=None, max_length=255)
+    
+    gsp: Optional[int] = Field(default=None, ge=0, le=16000000)
+    regional_rank: Optional[str] = Field(default=None, max_length=100)
+    best_wins: Optional[str] = Field(default=None, max_length=500)
+    characters: Optional[str] = Field(default=None, max_length=500)
+    
+    lounge_rating: Optional[int] = Field(default=None, ge=0, le=10000)
+    preferred_title: Optional[str] = Field(default=None, max_length=50)
+    controller_type: Optional[str] = Field(default=None, max_length=50)
+    playstyle: Optional[str] = Field(default=None, max_length=50)
+    preferred_tracks: Optional[str] = Field(default=None, max_length=255)
+
+    @field_validator("tournament_experience_details", mode="before")
+    @classmethod
+    def normalize_tournament_experience_details(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
+
+
+class RecruitApplyInput(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=50)
+    last_name: str = Field(..., min_length=1, max_length=50)
+    email: EmailStr
+    discord: str = Field(..., min_length=2, max_length=50)
+    current_school: Optional[str] = Field(default=None, max_length=100)
+    graduation_year: Optional[int] = None
+    preferred_contact: Optional[Literal["discord", "email"]] = None
+
+    availability: AvailabilityInput
+    game_slug: Literal[
+        "valorant",
+        "cs2",
+        "fortnite",
+        "r6",
+        "rocket-league",
+        "overwatch",
+        "cod",
+        "hearthstone",
+        "smash",
+        "mario-kart"
+    ]
+    profile: RecruitProfileInput
+
+    @field_validator("graduation_year")
+    @classmethod
+    def validate_graduation_year(cls, v):
+        if v is None:
+            return v
+        if v < MIN_FOUR_DIGIT_YEAR or v > MAX_FOUR_DIGIT_YEAR:
+            raise ValueError("graduation_year must be a valid 4-digit year")
+
+        in_custom_range = MIN_GRADUATION_YEAR <= v <= MAX_CUSTOM_GRADUATION_YEAR
+        in_preset_range = MIN_PRESET_GRADUATION_YEAR <= v <= MAX_PRESET_GRADUATION_YEAR
+        if not in_custom_range and not in_preset_range:
+            raise ValueError(
+                (
+                    "graduation_year must be within the custom range "
+                    f"({MIN_GRADUATION_YEAR}-{MAX_CUSTOM_GRADUATION_YEAR}) "
+                    "or preset range "
+                    f"({MIN_PRESET_GRADUATION_YEAR}-{MAX_PRESET_GRADUATION_YEAR})"
+                )
+            )
+        return v
+    
+    @model_validator(mode="after")
+    def validate_profile_by_game(self):
+        if self.game_slug not in {"smash", "mario-kart"}:
+            if not self.profile.ign:
+                raise ValueError("ign is required for this game")
+            if not self.profile.current_rank_label:
+                raise ValueError("current_rank_label is required for this game")
+            if not self.profile.primary_role:
+                raise ValueError("primary_role is required for this game")
+
+        if self.profile.tournament_experience not in TOURNAMENT_EXPERIENCE_WITH_DETAILS:
+            self.profile.tournament_experience_details = None
+
+        return self
