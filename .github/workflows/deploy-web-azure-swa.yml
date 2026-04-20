@@ -27,3 +27,5 @@ jobs:
           api_location: ""
           app_build_command: "npm ci && npm run build"
           output_location: ".next"
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
