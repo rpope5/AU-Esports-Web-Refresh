@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from 'next/image'
 import Link from 'next/link'
 import { Player } from "@/types/Player";
+import { GameOption } from "@/types/GameOption";
 import RosterGrid from "@/components/RosterGrid";
 import Header from "../components/Header";
 
@@ -47,13 +48,49 @@ export default function Home() {
 
   const [matches, setMatches] = useState<any[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [games, setGames] = useState<GameOption[]>([]);
+  const [selectedGameSlug, setSelectedGameSlug] = useState<string>("all");
 
 useEffect(() => {
-  fetch(`${apiUrl}/api/v1/roster`)
-    .then((res) => res.json())
-    .then((data) => setPlayers(data))
-    .catch(() => console.error("Failed to load roster"));
+  Promise.all([
+    fetch(`${apiUrl}/api/v1/roster`),
+    fetch(`${apiUrl}/api/v1/games`),
+  ])
+    .then(async ([rosterRes, gamesRes]) => {
+      if (!rosterRes.ok) throw new Error("Failed to load roster");
+      const rosterData = await rosterRes.json();
+      setPlayers(Array.isArray(rosterData) ? rosterData : []);
+
+      if (gamesRes.ok) {
+        const gamesData = await gamesRes.json();
+        setGames(Array.isArray(gamesData) ? gamesData : []);
+      } else {
+        setGames([]);
+      }
+    })
+    .catch(() => console.error("Failed to load roster data"));
 }, [apiUrl]);
+
+  const gameOptions = useMemo(() => {
+    if (games.length > 0) return games;
+
+    const bySlug = new Map<string, GameOption>();
+    for (const player of players) {
+      const slug = player.primary_game_slug;
+      const name = player.primary_game_name || player.game;
+      if (!slug || !name || bySlug.has(slug)) continue;
+      bySlug.set(slug, { id: -1, slug, name });
+    }
+    return Array.from(bySlug.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [games, players]);
+
+  const filteredPlayers = useMemo(() => {
+    if (selectedGameSlug === "all") return players;
+    return players.filter((player) => {
+      if (player.primary_game_slug === selectedGameSlug) return true;
+      return Array.isArray(player.secondary_game_slugs) && player.secondary_game_slugs.includes(selectedGameSlug);
+    });
+  }, [players, selectedGameSlug]);
 
 // Load matches
   useEffect(() => {
@@ -248,7 +285,33 @@ useEffect(() => {
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
 
       <div className="text-4xl py-8 text-center font-Gotham-Bold">Team Roster</div>
-      <RosterGrid players={players} />
+
+      <div className="mx-auto mb-6 w-full max-w-sm px-6">
+        <label htmlFor="roster-game-filter" className="mb-2 block text-sm font-medium text-gray-200">
+          Filter by game
+        </label>
+        <select
+          id="roster-game-filter"
+          className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+          value={selectedGameSlug}
+          onChange={(event) => setSelectedGameSlug(event.target.value)}
+        >
+          <option value="all">All Games</option>
+          {gameOptions.map((game) => (
+            <option key={game.slug} value={game.slug}>
+              {game.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {filteredPlayers.length > 0 ? (
+        <RosterGrid players={filteredPlayers} />
+      ) : (
+        <div className="mx-6 mb-16 rounded-xl border border-gray-700 bg-gray-900/60 px-6 py-10 text-center text-sm text-gray-300">
+          No roster members for this game yet.
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import RosterCard from "@/components/RosterCard";
+import type { GameOption } from "@/types/GameOption";
 import type { Player } from "@/types/Player";
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
@@ -12,7 +13,8 @@ import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSessio
 type RosterFormState = {
   name: string;
   gamertag: string;
-  game: string;
+  primary_game_slug: string;
+  secondary_game_slugs: string[];
   role: string;
   rank: string;
   year: string;
@@ -23,7 +25,8 @@ type RosterFormState = {
 const EMPTY_FORM: RosterFormState = {
   name: "",
   gamertag: "",
-  game: "",
+  primary_game_slug: "",
+  secondary_game_slugs: [],
   role: "",
   rank: "",
   year: "",
@@ -35,8 +38,57 @@ function normalizeField(value: string): string {
   return value.trim();
 }
 
-function appendOptional(formData: FormData, key: keyof RosterFormState, value: string): void {
+type OptionalTextField = "role" | "rank" | "year" | "major" | "headshot_url";
+
+function appendOptional(formData: FormData, key: OptionalTextField, value: string): void {
   formData.append(key, normalizeField(value));
+}
+
+type SecondaryGameSelectorProps = {
+  games: GameOption[];
+  primarySlug: string;
+  selectedSlugs: string[];
+  disabled?: boolean;
+  onToggle: (slug: string, checked: boolean) => void;
+};
+
+function SecondaryGameSelector({
+  games,
+  primarySlug,
+  selectedSlugs,
+  disabled = false,
+  onToggle,
+}: SecondaryGameSelectorProps) {
+  if (games.length === 0) {
+    return (
+      <p className="text-xs text-neutral-500">
+        No canonical games are currently available.
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {games.map((game) => {
+        const isPrimary = game.slug === primarySlug;
+        const isChecked = selectedSlugs.includes(game.slug);
+        return (
+          <label key={game.slug} className="flex items-center gap-2 rounded border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-300">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              disabled={disabled || isPrimary}
+              onChange={(event) => onToggle(game.slug, event.target.checked)}
+            />
+            <span>
+              {game.name}
+              {isPrimary ? " (Primary)" : ""}
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function AdminRosterPage() {
@@ -45,6 +97,7 @@ export default function AdminRosterPage() {
 
   const [session, setSession] = useState<AdminSession | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [games, setGames] = useState<GameOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -63,6 +116,18 @@ export default function AdminRosterPage() {
   const canViewRoster = Boolean(session?.permissions.can_view_roster);
   const canManageRoster = Boolean(session?.permissions.can_manage_roster);
   const canDeleteRoster = Boolean(session?.permissions.can_delete_roster);
+
+  const normalizeSecondarySlugs = useCallback((slugs: string[], primarySlug: string): string[] => {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+    for (const rawSlug of slugs) {
+      const slug = rawSlug.trim().toLowerCase();
+      if (!slug || slug === primarySlug || seen.has(slug)) continue;
+      seen.add(slug);
+      deduped.push(slug);
+    }
+    return deduped;
+  }, []);
 
   function updateCreateField<K extends keyof RosterFormState>(field: K, value: RosterFormState[K]): void {
     setCreateForm((prev) => ({ ...prev, [field]: value }));
@@ -106,6 +171,41 @@ export default function AdminRosterPage() {
     [apiUrl, router],
   );
 
+  const loadGames = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/games`);
+      if (!res.ok) throw new Error("Failed to load canonical games");
+      const data = (await res.json()) as GameOption[];
+      setGames(Array.isArray(data) ? data : []);
+    } catch {
+      setGames([]);
+    }
+  }, [apiUrl]);
+
+  function toggleCreateSecondaryGame(slug: string, checked: boolean): void {
+    setCreateForm((prev) => {
+      const next = checked
+        ? [...prev.secondary_game_slugs, slug]
+        : prev.secondary_game_slugs.filter((item) => item !== slug);
+      return {
+        ...prev,
+        secondary_game_slugs: normalizeSecondarySlugs(next, prev.primary_game_slug),
+      };
+    });
+  }
+
+  function toggleEditSecondaryGame(slug: string, checked: boolean): void {
+    setEditForm((prev) => {
+      const next = checked
+        ? [...prev.secondary_game_slugs, slug]
+        : prev.secondary_game_slugs.filter((item) => item !== slug);
+      return {
+        ...prev,
+        secondary_game_slugs: normalizeSecondarySlugs(next, prev.primary_game_slug),
+      };
+    });
+  }
+
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
     if (!token) {
@@ -138,7 +238,7 @@ export default function AdminRosterPage() {
           return;
         }
 
-        await loadRoster(token);
+        await Promise.all([loadRoster(token), loadGames()]);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to initialize roster editor");
         setLoading(false);
@@ -146,14 +246,29 @@ export default function AdminRosterPage() {
     };
 
     void init();
-  }, [apiUrl, loadRoster, router]);
+  }, [apiUrl, loadGames, loadRoster, router]);
+
+  useEffect(() => {
+    if (games.length === 0) return;
+    setCreateForm((prev) => {
+      if (prev.primary_game_slug) return prev;
+      return { ...prev, primary_game_slug: games[0].slug };
+    });
+  }, [games]);
 
   function beginEdit(player: Player): void {
+    const primarySlug = player.primary_game_slug ?? "";
+    const secondarySlugs = normalizeSecondarySlugs(
+      Array.isArray(player.secondary_game_slugs) ? player.secondary_game_slugs : [],
+      primarySlug,
+    );
+
     setEditingId(player.id);
     setEditForm({
       name: player.name ?? "",
       gamertag: player.gamertag ?? "",
-      game: player.game ?? "",
+      primary_game_slug: primarySlug,
+      secondary_game_slugs: secondarySlugs,
       role: player.role ?? "",
       rank: player.rank ?? "",
       year: player.year ?? "",
@@ -184,9 +299,10 @@ export default function AdminRosterPage() {
 
     const name = normalizeField(createForm.name);
     const gamertag = normalizeField(createForm.gamertag);
-    const game = normalizeField(createForm.game);
-    if (!name || !gamertag || !game) {
-      setError("Name, gamertag, and game are required.");
+    const primaryGameSlug = normalizeField(createForm.primary_game_slug).toLowerCase();
+    const secondaryGameSlugs = normalizeSecondarySlugs(createForm.secondary_game_slugs, primaryGameSlug);
+    if (!name || !gamertag || !primaryGameSlug) {
+      setError("Name, gamertag, and primary game are required.");
       return;
     }
 
@@ -197,7 +313,8 @@ export default function AdminRosterPage() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("gamertag", gamertag);
-      formData.append("game", game);
+      formData.append("primary_game_slug", primaryGameSlug);
+      formData.append("secondary_game_slugs", JSON.stringify(secondaryGameSlugs));
       appendOptional(formData, "role", createForm.role);
       appendOptional(formData, "rank", createForm.rank);
       appendOptional(formData, "year", createForm.year);
@@ -225,7 +342,10 @@ export default function AdminRosterPage() {
         throw new Error(responseText || "Failed to create roster member");
       }
 
-      setCreateForm(EMPTY_FORM);
+      setCreateForm((prev) => ({
+        ...EMPTY_FORM,
+        primary_game_slug: prev.primary_game_slug,
+      }));
       setCreateHeadshot(null);
       setSuccess("Roster member created.");
       await loadRoster(token);
@@ -249,9 +369,10 @@ export default function AdminRosterPage() {
 
     const name = normalizeField(editForm.name);
     const gamertag = normalizeField(editForm.gamertag);
-    const game = normalizeField(editForm.game);
-    if (!name || !gamertag || !game) {
-      setError("Name, gamertag, and game are required.");
+    const primaryGameSlug = normalizeField(editForm.primary_game_slug).toLowerCase();
+    const secondaryGameSlugs = normalizeSecondarySlugs(editForm.secondary_game_slugs, primaryGameSlug);
+    if (!name || !gamertag || !primaryGameSlug) {
+      setError("Name, gamertag, and primary game are required.");
       return;
     }
 
@@ -262,7 +383,8 @@ export default function AdminRosterPage() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("gamertag", gamertag);
-      formData.append("game", game);
+      formData.append("primary_game_slug", primaryGameSlug);
+      formData.append("secondary_game_slugs", JSON.stringify(secondaryGameSlugs));
       appendOptional(formData, "role", editForm.role);
       appendOptional(formData, "rank", editForm.rank);
       appendOptional(formData, "year", editForm.year);
@@ -382,12 +504,32 @@ export default function AdminRosterPage() {
               value={createForm.gamertag}
               onChange={(event) => updateCreateField("gamertag", event.target.value)}
             />
-            <input
+            <select
               className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-              placeholder="Game"
-              value={createForm.game}
-              onChange={(event) => updateCreateField("game", event.target.value)}
-            />
+              value={createForm.primary_game_slug}
+              onChange={(event) => {
+                const nextPrimarySlug = event.target.value;
+                updateCreateField("primary_game_slug", nextPrimarySlug);
+                updateCreateField(
+                  "secondary_game_slugs",
+                  normalizeSecondarySlugs(createForm.secondary_game_slugs, nextPrimarySlug),
+                );
+              }}
+              disabled={games.length === 0}
+            >
+              {games.length === 0 ? (
+                <option value="">No canonical games available</option>
+              ) : (
+                <>
+                  <option value="">Select primary game</option>
+                  {games.map((game) => (
+                    <option key={game.slug} value={game.slug}>
+                      {game.name}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
             <input
               className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
               placeholder="Role"
@@ -421,6 +563,17 @@ export default function AdminRosterPage() {
           </div>
 
           <div className="mt-3">
+            <label className="mb-2 block text-sm text-neutral-300">Secondary / Additional Games (Optional)</label>
+            <SecondaryGameSelector
+              games={games}
+              primarySlug={createForm.primary_game_slug}
+              selectedSlugs={createForm.secondary_game_slugs}
+              disabled={creating || games.length === 0}
+              onToggle={toggleCreateSecondaryGame}
+            />
+          </div>
+
+          <div className="mt-3">
             <label className="text-sm text-neutral-300">Upload Headshot (Optional)</label>
             <input
               className="mt-1 block w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-sm"
@@ -436,7 +589,7 @@ export default function AdminRosterPage() {
           <div className="mt-4">
             <button
               type="button"
-              disabled={creating}
+              disabled={creating || games.length === 0}
               onClick={() => void createPlayer()}
               className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
             >
@@ -515,12 +668,42 @@ export default function AdminRosterPage() {
                         onChange={(event) => updateEditField("gamertag", event.target.value)}
                         placeholder="Gamertag"
                       />
-                      <input
+                      <select
                         className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
-                        value={editForm.game}
-                        onChange={(event) => updateEditField("game", event.target.value)}
-                        placeholder="Game"
-                      />
+                        value={editForm.primary_game_slug}
+                        onChange={(event) => {
+                          const nextPrimarySlug = event.target.value;
+                          updateEditField("primary_game_slug", nextPrimarySlug);
+                          updateEditField(
+                            "secondary_game_slugs",
+                            normalizeSecondarySlugs(editForm.secondary_game_slugs, nextPrimarySlug),
+                          );
+                        }}
+                        disabled={games.length === 0}
+                      >
+                        {games.length === 0 ? (
+                          <option value="">No canonical games available</option>
+                        ) : (
+                          <>
+                            <option value="">Select primary game</option>
+                            {games.map((game) => (
+                              <option key={game.slug} value={game.slug}>
+                                {game.name}
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      <div>
+                        <label className="mb-1 block text-xs text-neutral-300">Secondary / Additional Games</label>
+                        <SecondaryGameSelector
+                          games={games}
+                          primarySlug={editForm.primary_game_slug}
+                          selectedSlugs={editForm.secondary_game_slugs}
+                          disabled={isBusy || games.length === 0}
+                          onToggle={toggleEditSecondaryGame}
+                        />
+                      </div>
                       <input
                         className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
                         value={editForm.role}

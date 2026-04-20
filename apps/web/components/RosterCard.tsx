@@ -13,6 +13,9 @@ function resolveRosterHeadshot(imageUrl: string | null): string {
 
 
 export default function RosterCard({ player }: RosterCardProps) {
+  const primaryGameName = player.primary_game_name || player.game;
+  const secondaryGameNames = Array.isArray(player.secondary_game_names) ? player.secondary_game_names : [];
+
   return (
     <div className="bg-gray-900 rounded-xl p-4 shadow-lg flex flex-col items-center text-center border border-gray-700">
       <img
@@ -25,7 +28,10 @@ export default function RosterCard({ player }: RosterCardProps) {
       <p className="text-purple-400 font-semibold">{player.gamertag}</p>
 
       <div className="mt-3 text-sm text-gray-300 space-y-1">
-        <p><strong>Game:</strong> {player.game}</p>
+        <p><strong>Game:</strong> {primaryGameName}</p>
+        {secondaryGameNames.length > 0 && (
+          <p><strong>Additional Games:</strong> {secondaryGameNames.join(", ")}</p>
+        )}
         <p><strong>Role:</strong> {player.role || "N/A"}</p>
         <p><strong>Rank:</strong> {player.rank || "N/A"}</p>
         <p><strong>Year:</strong> {player.year || "N/A"}</p>
