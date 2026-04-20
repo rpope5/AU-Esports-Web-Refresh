@@ -60,7 +60,7 @@ function TwitterFeed() {
       <div className="twitter-box h-[600px] w-[250px] border-2 border-[#FFC72C] rounded-md overflow-hidden p-3">
         <div
           id="twitter-scroll"
-          className="flex flex-col gap-3 overflow-y-auto h-[560px] pr-1"
+          className="flex flex-col gap-3 overflow-y-auto overflow-x-hidden h-[560px] pr-1"
         >
           {tweets.length === 0 && !loading && (
             <p className="text-gray-400 text-sm text-center">Loading...</p>
