@@ -1,9 +1,9 @@
 import os
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.deps import (
     StaffPrincipal,
     get_db,
@@ -17,10 +17,11 @@ from app.schemas.roster import PlayerOut
 
 router = APIRouter()
 
-API_ROOT = Path(__file__).resolve().parents[3]
+settings = get_settings()
 ROSTER_HEADSHOT_UPLOAD = ImageUploadConfig(
-    upload_dir=API_ROOT / "uploads" / "roster",
+    upload_dir=settings.uploads_root_path / "roster",
     public_prefix="/uploads/roster",
+    blob_prefix="roster",
     max_upload_bytes=int(os.getenv("ROSTER_HEADSHOT_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
     non_image_error_detail="Uploaded headshot must be an image",
     file_size_subject="Headshot",

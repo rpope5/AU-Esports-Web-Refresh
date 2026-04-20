@@ -1,10 +1,10 @@
 import os
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session, aliased
 
+from app.core.config import get_settings
 from app.core.deps import (
     StaffPrincipal,
     ensure_game_access,
@@ -25,10 +25,11 @@ from app.schemas.announcement import (
 
 router = APIRouter()
 
-API_ROOT = Path(__file__).resolve().parents[3]
+settings = get_settings()
 NEWS_IMAGE_UPLOAD = ImageUploadConfig(
-    upload_dir=API_ROOT / "uploads" / "news",
+    upload_dir=settings.uploads_root_path / "news",
     public_prefix="/uploads/news",
+    blob_prefix="news",
     max_upload_bytes=int(os.getenv("NEWS_IMAGE_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024))),
     non_image_error_detail="Uploaded file must be an image",
     file_size_subject="Image",

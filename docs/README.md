@@ -27,4 +27,5 @@ docs/ # diagrams and documentation
 
 - [Recruit Scoring System (Capstone)](./recruit-scoring-system.md)
 - [Recruit Triage Playbook (Phase 1)](./recruit-triage-playbook.md)
+- [Azure Deployment Guide](../DEPLOY_AZURE.md)
 

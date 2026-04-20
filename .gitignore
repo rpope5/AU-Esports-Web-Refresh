@@ -25,6 +25,13 @@ __pycache__/
 venv/
 
 apps/api/dev.db
+apps/api/uploads/**
+!apps/api/uploads/
+!apps/api/uploads/news/
+!apps/api/uploads/roster/
+!apps/api/uploads/.gitkeep
+!apps/api/uploads/roster/.gitkeep
+!apps/api/uploads/news/.gitkeep
 # node / next
 node_modules/
 .next/
