@@ -18,6 +18,7 @@ export default function RosterCard({ player }: RosterCardProps) {
 
   return (
     <div className="bg-gray-900 rounded-xl p-4 shadow-lg flex flex-col items-center text-center border border-gray-700">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={resolveRosterHeadshot(player.headshot)}
         alt={player.name}

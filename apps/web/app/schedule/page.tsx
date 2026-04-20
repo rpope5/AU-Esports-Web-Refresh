@@ -20,45 +20,6 @@ export default function Home() {
     "Hall of Fame": "/hof"
   };
 
-  const conferences = [
-    "ECAC",
-    "GLEC",
-    "NECC",
-    "CKL",
-    "PlayVS",
-    "CCL"
-  ];
-  const conferenceImages = [
-    '/ECAC.jpg',
-    '/GLEC.jpg',
-    '/NECC.jpg',
-    '/CKL.png',
-    '/PlayVS.jpg',
-    '/CCL.jpg',
-  ];
-  
-  const displayConferences = [...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences, ...conferences,...conferences, ...conferences, ...conferences];
-  const displayImages = [...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages, ...conferenceImages,...conferenceImages, ...conferenceImages, ...conferenceImages];
-  const confCycleLength = Math.max(1, conferences.length * 10);
-  
-  const [currentConfIndex, setCurrentConfIndex] = useState(0);
-  const [selectedConf, setSelectedConf] = useState<string | null>(null);
-
-  const prev = () => {
-    setCurrentConfIndex((prevIndex) => (prevIndex === 0 ? confCycleLength - 1 : prevIndex - 1));
-  };
-
-  const next = () => {
-    setCurrentConfIndex((prevIndex) => (prevIndex + 1) % confCycleLength);
-  };
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setCurrentConfIndex((i) => (i + 1) % confCycleLength);
-    }, 3000);
-    return () => clearInterval(id);
-  }, [confCycleLength]);
-
   const [isLive, setIsLive] = useState(false);
 
   useEffect(() => {

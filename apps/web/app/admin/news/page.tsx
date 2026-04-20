@@ -617,6 +617,8 @@ export default function AdminNewsPage() {
                   className="overflow-hidden rounded-xl border border-neutral-800 bg-black/60"
                 >
                   <div className="h-32 w-full bg-neutral-900">
+                    {/* Dynamic backend image URLs are rendered via img to preserve existing behavior across environments. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={resolvedImageUrl}
                       alt={item.title}

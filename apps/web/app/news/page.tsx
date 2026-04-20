@@ -247,6 +247,7 @@ export default function NewsPage() {
                           {isExpanded && (
                             <div id={announcementBodyId} className="mt-4">
                               <div className="h-44 w-full overflow-hidden rounded-lg bg-black">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={resolveAnnouncementImage(item.image_url, apiUrl)}
                                   alt={item.title}

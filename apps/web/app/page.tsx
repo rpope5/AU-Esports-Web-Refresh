@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import TopActivityFeedBar from "./components/TopActivityFeedBar";
@@ -14,58 +14,39 @@ function TwitterFeed() {
 
   type TwitterApiResponse = {
     items?: TweetItem[];
-    hasMore?: boolean;
   };
 
   const [tweets, setTweets] = useState<TweetItem[]>([]);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
-  const pageRef = useRef(1);
-
-  const loadTweets = useCallback(async (nextPage: number) => {
-    if (loading) return;
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`/api/twitter?page=${nextPage}`);
-      const data: TwitterApiResponse = await res.json();
-
-      if (data.items?.length) {
-        setTweets((prev) => [...prev, ...data.items]);
-      }
-      setHasMore(Boolean(data.hasMore));
-    } catch {}
-    finally {
-      setLoading(false);
-    }
-  }, [loading]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadTweets(1);
-    }, 0);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
-  }, [loadTweets]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const el = document.getElementById("twitter-scroll");
-      if (!el || loading || !hasMore) return;
-
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
-        const nextPage = pageRef.current + 1;
-        pageRef.current = nextPage;
-        void loadTweets(nextPage);
+    const loadRecentTweets = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/twitter");
+        const data: TwitterApiResponse = await res.json();
+        if (!cancelled) {
+          setTweets(data.items ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setTweets([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    const el = document.getElementById("twitter-scroll");
-    el?.addEventListener("scroll", handleScroll);
+    void loadRecentTweets();
 
-    return () => el?.removeEventListener("scroll", handleScroll);
-  }, [hasMore, loadTweets, loading]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="twitter-box h-[500px] w-[250px] border-2 border-gray-700 rounded-md overflow-hidden p-3">
@@ -107,17 +88,7 @@ function TwitterFeed() {
           </div>
         ))}
 
-        {loading && (
-          <p className="text-gray-400 text-xs text-center">
-            Loading more...
-          </p>
-        )}
-
-        {!hasMore && tweets.length > 0 && (
-          <p className="text-gray-500 text-xs text-center">
-            No more posts
-          </p>
-        )}
+        {loading && <p className="text-gray-400 text-xs text-center">Loading...</p>}
       </div>
     </div>
   );
@@ -306,14 +277,26 @@ export default function Home() {
                 href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
                 className="shop-btn"
               >
-                <img src="/crit.png" className="w-40" />
+                <Image
+                  src="/crit.png"
+                  alt="Shop Crit Apparel"
+                  width={160}
+                  height={64}
+                  className="w-40 h-auto"
+                />
               </a>
 
               <a
                 href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
                 className="shop-btn-alt"
               >
-                <img src="/jersey.png" className="w-40" />
+                <Image
+                  src="/jersey.png"
+                  alt="Shop Ashland jersey"
+                  width={160}
+                  height={64}
+                  className="w-40 h-auto"
+                />
               </a>
             </div>
 

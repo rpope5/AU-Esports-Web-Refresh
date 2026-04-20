@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
 
   const canManageUsers = Boolean(session?.permissions.can_manage_users);
   const canDeleteAccounts = canRenderDeleteAccountAction(session?.role);
-  const assignableRoles = options?.assignable_roles ?? [];
+  const assignableRoles = useMemo(() => options?.assignable_roles ?? [], [options?.assignable_roles]);
   const availableScopeGames = options?.games ?? [];
 
   const filteredRoleOptions = useMemo(
