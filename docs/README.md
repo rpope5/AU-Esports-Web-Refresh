@@ -8,24 +8,23 @@ A full-stack platform for Ashland University Esports:
 - Future: AI-assisted recruiting + recap generation
 
 ## Tech Stack
-- **Frontend:** Next.js (TypeScript, Tailwind)
-- **Backend:** FastAPI (Python)
+- **Frontend:** Next.js (TypeScript, Tailwind) on Vercel
+- **Backend:** FastAPI (Python) on Azure App Service (Linux)
 - **Database (local dev):** SQLite
-- **Database (deployment later):** Postgres (Supabase/Render)
-
----
+- **Database (production):** Azure Database for PostgreSQL Flexible Server
+- **Media (production):** Azure Blob Storage
 
 ## Repo Structure
-apps/
-web/ # Next.js frontend
-api/ # FastAPI backend
-docs/ # diagrams and documentation
+- `apps/web` - Next.js frontend
+- `apps/api` - FastAPI backend
+- `docs` - deployment and project documentation
 
----
+## Deployment Docs
+
+- [Frontend Deployment (Vercel)](./DEPLOY_VERCEL.md)
+- [Backend/Data Deployment (Azure)](./DEPLOY_AZURE.md)
 
 ## Recruiting Docs
 
 - [Recruit Scoring System (Capstone)](./recruit-scoring-system.md)
 - [Recruit Triage Playbook (Phase 1)](./recruit-triage-playbook.md)
-- [Azure Deployment Guide](../DEPLOY_AZURE.md)
-
