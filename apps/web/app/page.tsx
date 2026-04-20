@@ -52,56 +52,58 @@ function TwitterFeed() {
   }, [page, loading, hasMore]);
 
   return (
-    <div className="twitter-box h-[500px] w-[250px] border-2 border-gray-700 rounded-md overflow-hidden p-3">
+    <div className="flex flex-col items-center">
       <h2 className="text-[#FFC72C] font-bold mb-2 text-center">
         Latest Posts
       </h2>
 
-      <div
-        id="twitter-scroll"
-        className="flex flex-col gap-3 overflow-y-auto h-[440px] pr-1"
-      >
-        {tweets.length === 0 && !loading && (
-          <p className="text-gray-400 text-sm text-center">Loading...</p>
-        )}
+      <div className="twitter-box h-[600px] w-[250px] border-2 border-[#FFC72C] rounded-md overflow-hidden p-3">
+        <div
+          id="twitter-scroll"
+          className="flex flex-col gap-3 overflow-y-auto h-[560px] pr-1"
+        >
+          {tweets.length === 0 && !loading && (
+            <p className="text-gray-400 text-sm text-center">Loading...</p>
+          )}
 
-        {tweets.map((tweet, index) => (
-          <div key={index} className="border-b border-gray-700 pb-2">
-            <p
-              className="text-sm"
-              dangerouslySetInnerHTML={{ __html: tweet.title }}
-            />
+          {tweets.map((tweet, index) => (
+            <div key={index} className="border-b border-gray-700 pb-2">
+              <p
+                className="text-sm"
+                dangerouslySetInnerHTML={{ __html: tweet.title }}
+              />
 
-            <div className="flex justify-between items-center mt-2">
-              <a
-                href={tweet.link}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#FFC72C] text-xs hover:underline"
-              >
-                View Post →
-              </a>
+              <div className="flex justify-between items-center mt-2">
+                <a
+                  href={tweet.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#FFC72C] text-xs hover:underline"
+                >
+                  View Post →
+                </a>
 
-              {tweet.pubDate && (
-                <span className="text-gray-500 text-xs">
-                  {new Date(tweet.pubDate).toLocaleDateString()}
-                </span>
-              )}
+                {tweet.pubDate && (
+                  <span className="text-gray-500 text-xs">
+                    {new Date(tweet.pubDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {loading && (
-          <p className="text-gray-400 text-xs text-center">
-            Loading more...
-          </p>
-        )}
+          {loading && (
+            <p className="text-gray-400 text-xs text-center">
+              Loading more...
+            </p>
+          )}
 
-        {!hasMore && tweets.length > 0 && (
-          <p className="text-gray-500 text-xs text-center">
-            No more posts
-          </p>
-        )}
+          {!hasMore && tweets.length > 0 && (
+            <p className="text-gray-500 text-xs text-center">
+              No more posts
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -154,6 +156,8 @@ export default function Home() {
     ...conferenceImages,
     ...conferenceImages,
     ...conferenceImages,
+    ...conferenceImages,
+
   ];
 
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
