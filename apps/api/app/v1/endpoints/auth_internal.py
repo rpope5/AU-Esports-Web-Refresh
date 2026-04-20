@@ -17,6 +17,9 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is inactive")
+
     if not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -27,6 +30,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         access_token=token,
         role=staff.role,
         username=user.username,
+        must_change_password=bool(user.must_change_password),
         allowed_game_slugs=sorted(staff.allowed_game_slugs),
         has_global_game_access=staff.has_global_game_access,
         permissions=staff.permissions.to_dict(),

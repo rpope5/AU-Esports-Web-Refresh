@@ -40,12 +40,23 @@ function dateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function parseApiDate(raw: string): Date | null {
+  const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(raw);
+  const parsed = new Date(hasTimezone ? raw : `${raw}Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
 function formatEventTime(raw: string): string {
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw;
+  const parsed = parseApiDate(raw);
+  if (!parsed) return raw;
   return parsed.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 
@@ -56,6 +67,7 @@ export default function ScheduleCalendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
+  const viewerTimeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,15 +107,20 @@ export default function ScheduleCalendar() {
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const event of events) {
-      const parsed = new Date(event.time);
-      if (Number.isNaN(parsed.getTime())) continue;
+      const parsed = parseApiDate(event.time);
+      if (!parsed) continue;
       const key = dateKey(parsed);
       const bucket = map.get(key) || [];
       bucket.push(event);
       map.set(key, bucket);
     }
     for (const [, bucket] of map) {
-      bucket.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+      bucket.sort((a, b) => {
+        const aParsed = parseApiDate(a.time);
+        const bParsed = parseApiDate(b.time);
+        if (!aParsed || !bParsed) return 0;
+        return aParsed.getTime() - bParsed.getTime();
+      });
     }
     return map;
   }, [events]);
@@ -156,6 +173,7 @@ export default function ScheduleCalendar() {
             Next
           </button>
         </div>
+        <p className="mb-4 text-xs text-gray-400">Times are shown in your local timezone ({viewerTimeZone}).</p>
 
         <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-semibold uppercase tracking-wide text-[#FFC72C]/90 md:text-sm">
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (

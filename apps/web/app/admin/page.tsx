@@ -185,6 +185,20 @@ export default function AdminHome() {
         </div>
       )}
 
+      {me?.permissions.can_manage_users && (
+        <div className="mt-4">
+          <Link
+            href="/admin/users"
+            className="block rounded-2xl border border-neutral-800 bg-neutral-950 p-5 transition hover:border-neutral-700"
+          >
+            <h2 className="text-xl font-medium">User Management</h2>
+            <p className="mt-2 text-sm text-neutral-400">
+              Create and manage staff roles, game scopes, status, and password resets
+            </p>
+          </Link>
+        </div>
+      )}
+
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {visibleRecruitCards.map((game) => (
           <Link

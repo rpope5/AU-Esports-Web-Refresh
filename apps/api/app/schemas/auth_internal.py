@@ -24,6 +24,7 @@ class AuthResponse(BaseModel):
     access_token: str
     role: str
     username: str
+    must_change_password: bool = False
     allowed_game_slugs: list[str] = Field(default_factory=list)
     has_global_game_access: bool = False
     permissions: PermissionPayload

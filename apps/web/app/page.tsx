@@ -1,55 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Header from "./components/Header";
+import TopActivityFeedBar from "./components/TopActivityFeedBar";
 
 function TwitterFeed() {
-  const [tweets, setTweets] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-
-  const loadTweets = async (nextPage: number) => {
-    if (loading) return;
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`/api/twitter?page=${nextPage}`);
-      const data = await res.json();
-
-      if (data.items) {
-        setTweets((prev) => [...prev, ...data.items]);
-        setHasMore(data.hasMore);
-      }
-    } catch {}
-
-    setLoading(false);
+  type TweetItem = {
+    title: string;
+    pubDate?: string;
+    link: string;
   };
 
-  useEffect(() => {
-    loadTweets(1);
-  }, []);
+  type TwitterApiResponse = {
+    items?: TweetItem[];
+  };
+
+  const [tweets, setTweets] = useState<TweetItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const el = document.getElementById("twitter-scroll");
-      if (!el || loading || !hasMore) return;
+    let cancelled = false;
 
-      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
-        const nextPage = page + 1;
-        setPage(nextPage);
-        loadTweets(nextPage);
+    const loadRecentTweets = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/twitter");
+        const data: TwitterApiResponse = await res.json();
+        if (!cancelled) {
+          setTweets(data.items ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setTweets([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    const el = document.getElementById("twitter-scroll");
-    el?.addEventListener("scroll", handleScroll);
+    void loadRecentTweets();
 
-    return () => el?.removeEventListener("scroll", handleScroll);
-  }, [page, loading, hasMore]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col items-center">
@@ -90,6 +87,7 @@ function TwitterFeed() {
                 )}
               </div>
             </div>
+
           ))}
 
           {loading && (
@@ -104,6 +102,12 @@ function TwitterFeed() {
             </p>
           )}
         </div>
+=======
+          </div>
+        ))}
+
+        {loading && <p className="text-gray-400 text-xs text-center">Loading...</p>}
+
       </div>
     </div>
   );
@@ -163,19 +167,6 @@ export default function Home() {
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [matches, setMatches] = useState<any[]>([]);
-
-  useEffect(() => {
-    const tryLoad = async () => {
-      try {
-        const res = await fetch("/data/matches.json");
-        if (!res.ok) throw new Error("failed");
-        const data = await res.json();
-        if (Array.isArray(data) && data.length) setMatches(data);
-      } catch {}
-    };
-    tryLoad();
-  }, []);
 
   useEffect(() => {
     const checkLiveStatus = async () => {
@@ -205,57 +196,9 @@ export default function Home() {
     return () => clearInterval(id);
   }, [displayConferences.length]);
 
-  const [matchStart, setMatchStart] = useState(0);
-  const matchesToShow = 5;
-
-  const prevMatches = () => setMatchStart((s) => Math.max(0, s - 1));
-
-  const nextMatches = () =>
-    setMatchStart((s) =>
-      Math.min(Math.max(0, matches.length - matchesToShow), s + 1)
-    );
-
   return (
     <div className="min-h-screen bg-black text-white">
-
-      <div className="grid grid-cols-3 items-center w-full px-4">
-
-        <div className="justify-self-start">
-          <Header />
-        </div>
-
-        <div className="justify-self-center">
-          <div className="match-bar inline-flex items-center">
-            <button onClick={prevMatches} disabled={matchStart === 0}>
-              &larr;
-            </button>
-
-            <div className="match-list">
-              {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-                <div className="match-item" key={m.id}>
-                  <div className="match-teams">
-                    <span className="team-name">{m.ourTeam}</span>
-                    <span className="versus">vs</span>
-                    <span className="team-opponent">{m.opponent}</span>
-                  </div>
-                  <div className="match-game">{m.game}</div>
-                  <div className="match-time">{m.time}</div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={nextMatches}
-              disabled={matchStart >= matches.length - matchesToShow}
-            >
-              &rarr;
-            </button>
-          </div>
-        </div>
-
-        <div />
-
-      </div>
+      <TopActivityFeedBar />
 
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
 
@@ -355,14 +298,26 @@ export default function Home() {
                 href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
                 className="shop-btn"
               >
-                <img src="/crit.png" className="w-40" />
+                <Image
+                  src="/crit.png"
+                  alt="Shop Crit Apparel"
+                  width={160}
+                  height={64}
+                  className="w-40 h-auto"
+                />
               </a>
 
               <a
                 href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
                 className="shop-btn-alt"
               >
-                <img src="/jersey.png" className="w-40" />
+                <Image
+                  src="/jersey.png"
+                  alt="Shop Ashland jersey"
+                  width={160}
+                  height={64}
+                  className="w-40 h-auto"
+                />
               </a>
             </div>
 

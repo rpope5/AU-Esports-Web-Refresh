@@ -73,7 +73,7 @@ const PERMISSIONS_BY_ROLE: Record<string, AdminPermissions> = {
     can_delete_announcements: true,
     can_manage_schedule: true,
     can_delete_schedule: true,
-    can_manage_users: false,
+    can_manage_users: true,
   },
   admin: {
     can_view_recruits: true,
