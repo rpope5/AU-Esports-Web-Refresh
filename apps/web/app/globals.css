@@ -171,6 +171,12 @@ body {
 .match-item .versus { margin: 0 0.25rem; color:#FFC72C; font-weight:600; }
 .match-item .match-game { font-size:0.9rem; color:#d1d5db; }
 .match-item .match-time { font-size:0.8rem; color:#9ca3af; }
+.match-item .match-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 .match-arrow {
   background: transparent;

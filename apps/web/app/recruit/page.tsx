@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Header from "../components/Header";
+import TopActivityFeedBar from "../components/TopActivityFeedBar";
 
 type GameSlug = "valorant" | "cs2" | "fortnite" | "r6" | "rocket-league" | "overwatch" | "cod" | "hearthstone" | "smash" | "mario-kart";
 
@@ -55,14 +55,6 @@ type FormState = {
   controller_type: string;
   playstyle: string;
   preferred_tracks: string;
-};
-
-type Match = {
-  id: number;
-  ourTeam: string;
-  opponent: string;
-  game: string;
-  time: string;
 };
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -439,10 +431,6 @@ export default function RecruitPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [matchStart, setMatchStart] = useState(0);
-  const matchesToShow = 5;
-
   const roleOptions = useMemo(() => {
   if (form.game_slug === "valorant") return valorantRoles;
   if (form.game_slug === "cs2") return cs2Roles;
@@ -524,86 +512,6 @@ export default function RecruitPage() {
       preferred_tracks: "",
     }));
   }
-
-  useEffect(() => {
-    const tryLoad = async () => {
-      try {
-        const resX = await fetch("/data/matches.xlsx");
-        if (resX.ok) {
-          const buffer = await resX.arrayBuffer();
-          const XLSX = await import("xlsx").catch(() => null);
-          if (!XLSX) throw new Error("xlsx not available");
-
-          const wb = XLSX.read(buffer, { type: "array" });
-          const sheetName = wb.SheetNames[0];
-          const ws = wb.Sheets[sheetName];
-          const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
-          if (Array.isArray(raw) && raw.length) {
-            const parsed: Match[] = raw.map((r: any, i: number) => ({
-              id: Number(r.id) || i + 1,
-              ourTeam: r.ourTeam ?? r.OurTeam ?? r.Team ?? "Ashland",
-              opponent: r.opponent ?? r.Opponent ?? r.Opp ?? "",
-              game: r.game ?? r.Game ?? r.Platform ?? "",
-              time: r.time ?? r.Time ?? r.datetime ?? "",
-            }));
-            setMatches(parsed);
-            return;
-          }
-        }
-      } catch {}
-
-      try {
-        const resC = await fetch("/data/matches.csv");
-        if (resC.ok) {
-          const txt = await resC.text();
-          const rows = txt.trim().split("\n").map((r) => r.split(","));
-          const headers = rows.shift() || [];
-
-          const parsed: Match[] = rows.map((cols, i) => {
-            const obj: Record<string, string> = {};
-            headers.forEach((h, idx) => {
-              obj[h.trim()] = cols[idx] ? cols[idx].trim() : "";
-            });
-
-            return {
-              id: Number(obj.id) || i + 1,
-              ourTeam: obj.ourTeam || obj.OurTeam || "Ashland",
-              opponent: obj.opponent || obj.Opponent || "",
-              game: obj.game || obj.Game || "",
-              time: obj.time || obj.Time || "",
-            };
-          });
-
-          if (parsed.length) {
-            setMatches(parsed);
-            return;
-          }
-        }
-      } catch {}
-
-      try {
-        const r = await fetch("/data/matches.json");
-        if (!r.ok) throw new Error("failed");
-        const data = await r.json();
-        if (Array.isArray(data) && data.length) {
-          setMatches(data);
-        }
-      } catch {}
-    };
-
-    tryLoad();
-  }, []);
-
-  const prevMatches = () => {
-    setMatchStart((s) => Math.max(0, s - 1));
-  };
-
-  const nextMatches = () => {
-    setMatchStart((s) =>
-      Math.min(Math.max(0, matches.length - matchesToShow), s + 1)
-    );
-  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -822,45 +730,7 @@ const [isLive, setIsLive] = useState(false);
   }, []);
   return (
     <div className="min-h-screen bg-black text-white">
-    
-          <div className="grid grid-cols-3 items-center w-full px-4">
-    
-            <div className="justify-self-start">
-              <Header />
-            </div>
-    
-            <div className="justify-self-center">
-              <div className="match-bar inline-flex items-center">
-                <button onClick={prevMatches} disabled={matchStart === 0}>
-                  &larr;
-                </button>
-    
-                <div className="match-list">
-                  {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-                    <div className="match-item" key={m.id}>
-                      <div className="match-teams">
-                        <span className="team-name">{m.ourTeam}</span>
-                        <span className="versus">vs</span>
-                        <span className="team-opponent">{m.opponent}</span>
-                      </div>
-                      <div className="match-game">{m.game}</div>
-                      <div className="match-time">{m.time}</div>
-                    </div>
-                  ))}
-                </div>
-    
-                <button
-                  onClick={nextMatches}
-                  disabled={matchStart >= matches.length - matchesToShow}
-                >
-                  &rarr;
-                </button>
-              </div>
-            </div>
-    
-            <div />
-    
-          </div>
+      <TopActivityFeedBar />
 
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
 

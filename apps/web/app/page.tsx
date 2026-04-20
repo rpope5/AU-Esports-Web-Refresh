@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Header from "./components/Header";
+import TopActivityFeedBar from "./components/TopActivityFeedBar";
 
 function TwitterFeed() {
   const [tweets, setTweets] = useState<any[]>([]);
@@ -159,19 +159,6 @@ export default function Home() {
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
-  const [matches, setMatches] = useState<any[]>([]);
-
-  useEffect(() => {
-    const tryLoad = async () => {
-      try {
-        const res = await fetch("/data/matches.json");
-        if (!res.ok) throw new Error("failed");
-        const data = await res.json();
-        if (Array.isArray(data) && data.length) setMatches(data);
-      } catch {}
-    };
-    tryLoad();
-  }, []);
 
   useEffect(() => {
     const checkLiveStatus = async () => {
@@ -201,57 +188,9 @@ export default function Home() {
     return () => clearInterval(id);
   }, [displayConferences.length]);
 
-  const [matchStart, setMatchStart] = useState(0);
-  const matchesToShow = 5;
-
-  const prevMatches = () => setMatchStart((s) => Math.max(0, s - 1));
-
-  const nextMatches = () =>
-    setMatchStart((s) =>
-      Math.min(Math.max(0, matches.length - matchesToShow), s + 1)
-    );
-
   return (
     <div className="min-h-screen bg-black text-white">
-
-      <div className="grid grid-cols-3 items-center w-full px-4">
-
-        <div className="justify-self-start">
-          <Header />
-        </div>
-
-        <div className="justify-self-center">
-          <div className="match-bar inline-flex items-center">
-            <button onClick={prevMatches} disabled={matchStart === 0}>
-              &larr;
-            </button>
-
-            <div className="match-list">
-              {matches.slice(matchStart, matchStart + matchesToShow).map((m) => (
-                <div className="match-item" key={m.id}>
-                  <div className="match-teams">
-                    <span className="team-name">{m.ourTeam}</span>
-                    <span className="versus">vs</span>
-                    <span className="team-opponent">{m.opponent}</span>
-                  </div>
-                  <div className="match-game">{m.game}</div>
-                  <div className="match-time">{m.time}</div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={nextMatches}
-              disabled={matchStart >= matches.length - matchesToShow}
-            >
-              &rarr;
-            </button>
-          </div>
-        </div>
-
-        <div />
-
-      </div>
+      <TopActivityFeedBar />
 
       <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
 
