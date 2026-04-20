@@ -1,37 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import TopActivityFeedBar from "./components/TopActivityFeedBar";
 
 function TwitterFeed() {
-  const [tweets, setTweets] = useState<any[]>([]);
-  const [page, setPage] = useState(1);
+  type TweetItem = {
+    title: string;
+    pubDate?: string;
+    link: string;
+  };
+
+  type TwitterApiResponse = {
+    items?: TweetItem[];
+    hasMore?: boolean;
+  };
+
+  const [tweets, setTweets] = useState<TweetItem[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const pageRef = useRef(1);
 
-  const loadTweets = async (nextPage: number) => {
+  const loadTweets = useCallback(async (nextPage: number) => {
     if (loading) return;
 
     setLoading(true);
 
     try {
       const res = await fetch(`/api/twitter?page=${nextPage}`);
-      const data = await res.json();
+      const data: TwitterApiResponse = await res.json();
 
-      if (data.items) {
+      if (data.items?.length) {
         setTweets((prev) => [...prev, ...data.items]);
-        setHasMore(data.hasMore);
       }
+      setHasMore(Boolean(data.hasMore));
     } catch {}
-
-    setLoading(false);
-  };
+    finally {
+      setLoading(false);
+    }
+  }, [loading]);
 
   useEffect(() => {
-    loadTweets(1);
-  }, []);
+    const timeoutId = window.setTimeout(() => {
+      void loadTweets(1);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadTweets]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,9 +55,9 @@ function TwitterFeed() {
       if (!el || loading || !hasMore) return;
 
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
-        const nextPage = page + 1;
-        setPage(nextPage);
-        loadTweets(nextPage);
+        const nextPage = pageRef.current + 1;
+        pageRef.current = nextPage;
+        void loadTweets(nextPage);
       }
     };
 
@@ -49,7 +65,7 @@ function TwitterFeed() {
     el?.addEventListener("scroll", handleScroll);
 
     return () => el?.removeEventListener("scroll", handleScroll);
-  }, [page, loading, hasMore]);
+  }, [hasMore, loadTweets, loading]);
 
   return (
     <div className="twitter-box h-[500px] w-[250px] border-2 border-gray-700 rounded-md overflow-hidden p-3">

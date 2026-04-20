@@ -653,7 +653,9 @@ export default function RecruitPage() {
         throw new Error(text || "Failed to submit application");
       }
 
-      const data = JSON.parse(text);
+      if (text) {
+        JSON.parse(text);
+      }
 
       setSuccess(
         `Application submitted successfully.`
@@ -705,8 +707,9 @@ export default function RecruitPage() {
         best_wins: "",
         characters: "",
       }));
-    } catch (e: any) {
-      setErr(e?.message || "Submission failed");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Submission failed";
+      setErr(message);
     } finally {
       setLoading(false);
     }
