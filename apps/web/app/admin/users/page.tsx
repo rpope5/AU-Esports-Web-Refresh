@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
+import { canRenderDeleteAccountAction } from "./deleteVisibility";
 
 type StaffRole = "admin" | "head_coach" | "coach" | "captain";
 
@@ -105,6 +107,7 @@ export default function AdminUsersPage() {
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
   const canManageUsers = Boolean(session?.permissions.can_manage_users);
+  const canDeleteAccounts = canRenderDeleteAccountAction(session?.role);
   const assignableRoles = options?.assignable_roles ?? [];
   const availableScopeGames = options?.games ?? [];
 
@@ -429,6 +432,45 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function deleteUserAccount(user: ManagedUser): Promise<void> {
+    if (!canDeleteAccounts) {
+      throw new Error("You do not have permission to delete accounts.");
+    }
+
+    const token = getToken();
+    if (!token) throw new Error("Session expired");
+
+    setBusyUserId(user.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/admin/users/${user.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 401) {
+        clearAndRedirectToLogin();
+        throw new Error("Unauthorized");
+      }
+      if (!response.ok) {
+        throw new Error((await response.text()) || "Failed to delete account");
+      }
+
+      if (editingUserId === user.id) {
+        cancelEdit();
+      }
+      setSuccess(`Deleted account for ${user.username}.`);
+      await loadUsers(token);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete account";
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between gap-4">
@@ -601,8 +643,8 @@ export default function AdminUsersPage() {
                   const isBusy = busyUserId === user.id;
                   return (
                     <article key={user.id} className="rounded-xl border border-neutral-800 bg-black/60 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 lg:flex-1">
                           <h3 className="text-lg font-semibold">{user.username}</h3>
                           <p className="text-sm text-neutral-400">{user.email || "No email"}</p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -638,31 +680,43 @@ export default function AdminUsersPage() {
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={isBusy || !user.manageable}
-                            onClick={() => (isEditing ? cancelEdit() : beginEdit(user))}
-                            className="rounded border border-neutral-700 px-3 py-1 text-xs hover:border-neutral-500 disabled:opacity-50"
-                          >
-                            {isEditing ? "Cancel" : "Edit"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isBusy || !user.manageable}
-                            onClick={() => void toggleUserActive(user)}
-                            className="rounded border border-neutral-700 px-3 py-1 text-xs hover:border-neutral-500 disabled:opacity-50"
-                          >
-                            {user.is_active ? "Deactivate" : "Activate"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isBusy || !user.manageable}
-                            onClick={() => void resetPassword(user)}
-                            className="rounded border border-amber-700/80 bg-amber-950/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-50"
-                          >
-                            Reset Password
-                          </button>
+                        <div className="flex w-full flex-col items-start gap-2 lg:w-auto lg:items-end">
+                          <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+                            <button
+                              type="button"
+                              disabled={isBusy || !user.manageable}
+                              onClick={() => (isEditing ? cancelEdit() : beginEdit(user))}
+                              className="rounded border border-neutral-700 px-3 py-1 text-xs hover:border-neutral-500 disabled:opacity-50"
+                            >
+                              {isEditing ? "Cancel" : "Edit"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isBusy || !user.manageable}
+                              onClick={() => void toggleUserActive(user)}
+                              className="rounded border border-neutral-700 px-3 py-1 text-xs hover:border-neutral-500 disabled:opacity-50"
+                            >
+                              {user.is_active ? "Deactivate" : "Activate"}
+                            </button>
+                            {canDeleteAccounts && user.manageable && (
+                              <InlineDestructiveConfirm
+                                triggerLabel="Delete Account"
+                                confirmMessage={`Delete ${user.username}'s account permanently? This cannot be undone.`}
+                                confirmLabel="Delete Permanently"
+                                pendingLabel="Deleting..."
+                                busy={isBusy}
+                                onConfirm={() => deleteUserAccount(user)}
+                              />
+                            )}
+                            <button
+                              type="button"
+                              disabled={isBusy || !user.manageable}
+                              onClick={() => void resetPassword(user)}
+                              className="rounded border border-amber-700/80 bg-amber-950/30 px-3 py-1 text-xs text-amber-100 disabled:opacity-50"
+                            >
+                              Reset Password
+                            </button>
+                          </div>
                         </div>
                       </div>
 
