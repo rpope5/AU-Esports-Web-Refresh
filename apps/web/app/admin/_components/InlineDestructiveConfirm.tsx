@@ -31,7 +31,7 @@ export default function InlineDestructiveConfirm({
   }
 
   return (
-    <div>
+    <div className="inline-flex flex-col items-start">
       <button
         type="button"
         onClick={() => setIsOpen(true)}
@@ -42,7 +42,7 @@ export default function InlineDestructiveConfirm({
       </button>
 
       {isOpen && (
-        <div className="mt-3 rounded-lg border border-red-900 bg-red-950/40 p-3">
+        <div className="mt-3 max-w-md rounded-lg border border-red-900 bg-red-950/40 p-3">
           <p className="text-sm text-red-200">{confirmMessage}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button

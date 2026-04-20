@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,8 @@ from app.core.deps import StaffPrincipal, get_db, require_user_manager
 from app.core.passwords import hash_password
 from app.core.roles import StaffRole, normalize_staff_role, role_has_global_game_access
 from app.models.admin_user import AdminUser
+from app.models.announcement import EsportsAnnouncement
+from app.models.calendar_event import CalendarEvent
 from app.models.game import Game
 from app.models.staff_game_access import StaffGameAccess
 from app.schemas.users import (
@@ -133,6 +135,39 @@ def _active_admin_count(db: Session) -> int:
         1
         for role, is_active in admins
         if bool(is_active) and normalize_staff_role(role) == "admin"
+    )
+
+
+def _ensure_admin_actor_for_delete(actor: StaffPrincipal) -> None:
+    if actor.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def _clear_user_references_before_delete(db: Session, user_id: int) -> None:
+    (
+        db.query(EsportsAnnouncement)
+        .filter(EsportsAnnouncement.created_by_admin_id == user_id)
+        .update({EsportsAnnouncement.created_by_admin_id: None}, synchronize_session=False)
+    )
+    (
+        db.query(EsportsAnnouncement)
+        .filter(EsportsAnnouncement.approved_by_admin_id == user_id)
+        .update({EsportsAnnouncement.approved_by_admin_id: None}, synchronize_session=False)
+    )
+    (
+        db.query(CalendarEvent)
+        .filter(CalendarEvent.created_by_admin_id == user_id)
+        .update({CalendarEvent.created_by_admin_id: None}, synchronize_session=False)
+    )
+    (
+        db.query(CalendarEvent)
+        .filter(CalendarEvent.approved_by_admin_id == user_id)
+        .update({CalendarEvent.approved_by_admin_id: None}, synchronize_session=False)
+    )
+    (
+        db.query(CalendarEvent)
+        .filter(CalendarEvent.rejected_by_admin_id == user_id)
+        .update({CalendarEvent.rejected_by_admin_id: None}, synchronize_session=False)
     )
 
 
@@ -399,3 +434,33 @@ def reset_user_password(
 
     scope_map = _scope_rows_for_users(db, [user.id])
     return _serialize_user(actor, user, scope_map, actor_scope_ids)
+
+
+@router.delete("/admin/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    actor: StaffPrincipal = Depends(require_user_manager),
+):
+    _ensure_admin_actor_for_delete(actor)
+
+    user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == actor.user_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    target_role = normalize_staff_role(user.role)
+    if target_role == "admin" and bool(user.is_active) and _active_admin_count(db) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the last active admin")
+
+    try:
+        _clear_user_references_before_delete(db, user.id)
+        db.delete(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return Response(status_code=204)
