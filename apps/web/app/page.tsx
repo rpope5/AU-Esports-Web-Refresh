@@ -1,113 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import TopActivityFeedBar from "./components/TopActivityFeedBar";
 
 function TwitterFeed() {
-  type TweetItem = {
-    title: string;
-    pubDate?: string;
-    link: string;
-  };
-
-  type TwitterApiResponse = {
-    items?: TweetItem[];
-  };
-
-  const [tweets, setTweets] = useState<TweetItem[]>([]);
+  const [tweets, setTweets] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadTweets = async (nextPage: number) => {
+    if (loading) return;
 
-    const loadRecentTweets = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/twitter");
-        const data: TwitterApiResponse = await res.json();
-        if (!cancelled) {
-          setTweets(data.items ?? []);
-        }
-      } catch {
-        if (!cancelled) {
-          setTweets([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    setLoading(true);
+
+    try {
+      const res = await fetch(`/api/twitter?page=${nextPage}`);
+      const data = await res.json();
+
+      if (data.items) {
+        setTweets((prev) => [...prev, ...data.items]);
+        setHasMore(data.hasMore);
+      }
+    } catch {}
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadTweets(1);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const el = document.getElementById("twitter-scroll");
+      if (!el || loading || !hasMore) return;
+
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        loadTweets(nextPage);
       }
     };
 
-    void loadRecentTweets();
+    const el = document.getElementById("twitter-scroll");
+    el?.addEventListener("scroll", handleScroll);
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => el?.removeEventListener("scroll", handleScroll);
+  }, [page, loading, hasMore]);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="twitter-box h-[500px] w-[250px] border-2 border-gray-700 rounded-md overflow-hidden p-3">
       <h2 className="text-[#FFC72C] font-bold mb-2 text-center">
         Latest Posts
       </h2>
 
-      <div className="twitter-box h-[600px] w-[250px] border-2 border-[#FFC72C] rounded-md overflow-hidden p-3">
-        <div
-          id="twitter-scroll"
-          className="flex flex-col gap-3 overflow-y-auto overflow-x-hidden h-[560px] pr-1"
-        >
-          {tweets.length === 0 && !loading && (
-            <p className="text-gray-400 text-sm text-center">Loading...</p>
-          )}
+      <div
+        id="twitter-scroll"
+        className="flex flex-col gap-3 overflow-y-auto h-[440px] pr-1"
+      >
+        {tweets.length === 0 && !loading && (
+          <p className="text-gray-400 text-sm text-center">Loading...</p>
+        )}
 
-          {tweets.map((tweet, index) => (
-            <div key={index} className="border-b border-gray-700 pb-2">
-              <p
-                className="text-sm"
-                dangerouslySetInnerHTML={{ __html: tweet.title }}
-              />
+        {tweets.map((tweet, index) => (
+          <div key={index} className="border-b border-gray-700 pb-2">
+            <p
+              className="text-sm"
+              dangerouslySetInnerHTML={{ __html: tweet.title }}
+            />
 
-              <div className="flex justify-between items-center mt-2">
-                <a
-                  href={tweet.link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[#FFC72C] text-xs hover:underline"
-                >
-                  View Post →
-                </a>
+            <div className="flex justify-between items-center mt-2">
+              <a
+                href={tweet.link}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#FFC72C] text-xs hover:underline"
+              >
+                View Post →
+              </a>
 
-                {tweet.pubDate && (
-                  <span className="text-gray-500 text-xs">
-                    {new Date(tweet.pubDate).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
+              {tweet.pubDate && (
+                <span className="text-gray-500 text-xs">
+                  {new Date(tweet.pubDate).toLocaleDateString()}
+                </span>
+              )}
             </div>
-
-          ))}
-
-          {loading && (
-            <p className="text-gray-400 text-xs text-center">
-              Loading more...
-            </p>
-          )}
-
-          {!hasMore && tweets.length > 0 && (
-            <p className="text-gray-500 text-xs text-center">
-              No more posts
-            </p>
-          )}
-        </div>
-=======
           </div>
         ))}
 
-        {loading && <p className="text-gray-400 text-xs text-center">Loading...</p>}
+        {loading && (
+          <p className="text-gray-400 text-xs text-center">
+            Loading more...
+          </p>
+        )}
 
+        {!hasMore && tweets.length > 0 && (
+          <p className="text-gray-500 text-xs text-center">
+            No more posts
+          </p>
+        )}
       </div>
     </div>
   );
@@ -160,8 +154,6 @@ export default function Home() {
     ...conferenceImages,
     ...conferenceImages,
     ...conferenceImages,
-    ...conferenceImages,
-
   ];
 
   const [currentConfIndex, setCurrentConfIndex] = useState(0);
@@ -298,26 +290,14 @@ export default function Home() {
                 href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
                 className="shop-btn"
               >
-                <Image
-                  src="/crit.png"
-                  alt="Shop Crit Apparel"
-                  width={160}
-                  height={64}
-                  className="w-40 h-auto"
-                />
+                <img src="/crit.png" className="w-40" />
               </a>
 
               <a
                 href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
                 className="shop-btn-alt"
               >
-                <Image
-                  src="/jersey.png"
-                  alt="Shop Ashland jersey"
-                  width={160}
-                  height={64}
-                  className="w-40 h-auto"
-                />
+                <img src="/jersey.png" className="w-40" />
               </a>
             </div>
 
