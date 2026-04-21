@@ -45,7 +45,7 @@ export default function Home() {
 
         <div className="flex items-center gap-2">
           <Image
-            src="/Eagles (2).png"
+            src="/Eagle.png"
             alt="Ashland Eagle Logo"
             width={90}
             height={90}
@@ -120,7 +120,8 @@ export default function Home() {
 
     <div className="pointer-events-auto bg-[#5C068C] rounded-xl p-6 flex items-center justify-center text-center text-white h-full">
       <p className="font-semibold">
-        Add any additional content here (sponsors, events, announcements, etc.).
+        Thank you for your support!<br />
+        
       </p>
     </div>
 

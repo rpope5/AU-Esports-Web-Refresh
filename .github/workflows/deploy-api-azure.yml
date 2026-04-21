@@ -8,7 +8,7 @@ on:
     paths:
       - "apps/api/**"
       - ".github/workflows/deploy-api-azure.yml"
-      - "DEPLOY_AZURE.md"
+      - "docs/DEPLOY_AZURE.md"
 
 jobs:
   deploy-api:

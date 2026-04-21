@@ -29,8 +29,15 @@
 
 - `APP_ENV` (`development` or `production`)
 - `DATABASE_URL` (PostgreSQL in production, SQLite for local)
-- `CORS_ORIGINS` (comma-separated frontend origins)
+- `CORS_ORIGINS` (comma-separated frontend origins, including your Vercel domain in production)
 - `JWT_SECRET`
 - `MEDIA_BACKEND` (`local` or `azure_blob`)
 - `MEDIA_AZURE_BLOB_CONNECTION_STRING` (required when `MEDIA_BACKEND=azure_blob`)
 - `MEDIA_AZURE_BLOB_CONTAINER`
+
+## Deployment model
+
+- Frontend is deployed on Vercel from `apps/web`
+- Backend remains on Azure App Service from `apps/api`
+- See `../../docs/DEPLOY_AZURE.md` for backend/data deployment
+- See `../../docs/DEPLOY_VERCEL.md` for frontend deployment and API wiring

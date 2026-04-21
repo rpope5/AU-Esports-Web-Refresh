@@ -108,7 +108,7 @@ export default function NewsPage() {
       <header className="site-header flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
         <div className="flex items-center gap-2">
           <Image
-            src="/Eagles (2).png"
+            src="/Eagle.png"
             alt="Ashland Eagle Logo"
             width={90}
             height={90}
