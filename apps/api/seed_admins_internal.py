@@ -6,8 +6,8 @@ def seed():
     db = SessionLocal()
 
     try:
-        username = "AuDev"
-        password = "AURefreshTeam"
+        username = ""
+        password = ""
 
         existing = db.query(AdminUser).filter(AdminUser.username == username).first()
         if existing:
