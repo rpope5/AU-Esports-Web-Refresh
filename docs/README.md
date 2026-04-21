@@ -19,6 +19,14 @@ A full-stack platform for Ashland University Esports:
 - `apps/api` - FastAPI backend
 - `docs` - deployment and project documentation
 
+## Local Tooling
+- Package manager: `npm`
+- Root `package.json` provides orchestration scripts; frontend dependencies are installed in `apps/web` (not hoisted at repo root)
+- Typical frontend commands from repo root:
+  - `npm run install:web`
+  - `npm run dev:web`
+  - `npm run build:web`
+
 ## Deployment Docs
 
 - [Frontend Deployment (Vercel)](./DEPLOY_VERCEL.md)

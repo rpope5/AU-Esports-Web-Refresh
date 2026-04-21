@@ -53,7 +53,7 @@ export default function Home() {
 
         <div className="flex items-center gap-2">
           <Image
-            src="/Eagles (2).png"
+            src="/Eagle.png"
             alt="Ashland Eagle Logo"
             width={90}
             height={90}

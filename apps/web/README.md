@@ -2,13 +2,17 @@
 
 ## Local development
 
+Package manager: `npm` (this repo does not use npm/pnpm/yarn workspaces for `apps/web` dependencies).
+
 1. Install dependencies:
-   - `npm ci`
+   - from `apps/web`: `npm ci`
+   - or from repo root: `npm run install:web`
 2. Configure environment:
    - copy `.env.example` to `.env.local`
    - set `NEXT_PUBLIC_API_URL` (local default is `http://localhost:8000`)
 3. Run:
-   - `npm run dev`
+   - from `apps/web`: `npm run dev`
+   - or from repo root: `npm run dev:web`
 
 ## Production notes
 
