@@ -56,7 +56,7 @@ function normalizeScheduleItems(scheduleItems: ScheduleEventApi[]): SiteActivity
       id: `schedule-${item.id}`,
       itemType: "schedule",
       title: item.name,
-      subtitle: item.game_name || item.game || "Scheduled event",
+      subtitle: item.game_name || item.game || item.game_slug || "General",
       startsAt: item.time,
       publishedAt: null,
       displayDate: formatDisplayDate(item.time),
