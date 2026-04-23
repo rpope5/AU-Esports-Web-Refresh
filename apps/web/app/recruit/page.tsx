@@ -373,6 +373,8 @@ const marioKartTournamentDetailLevels = new Set(["local", "regional", "national"
 
 export default function RecruitPage() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const recruitingDiscordUrl =
+    process.env.NEXT_PUBLIC_RECRUITING_DISCORD_URL || "https://discord.gg/C8gZKgK8B9";
 
   const [form, setForm] = useState<FormState>({
     first_name: "",
@@ -792,6 +794,27 @@ const [isLive, setIsLive] = useState(false);
             We have opportunities for scholarships through our athletics department!
           </p>
         </div>
+
+        <section className="mb-8 rounded-2xl border-2 border-[#FFC72C] bg-neutral-950 p-6 shadow-lg shadow-[#5C068C]/20">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-2xl font-semibold text-[#FFC72C]">
+                Join our official recruiting/tryouts Discord!
+              </h3>
+              <p className="mt-2 text-sm text-neutral-200">
+                Questions about tryouts or recruiting? Join our official recruiting Discord.
+              </p>
+            </div>
+            <a
+              href={recruitingDiscordUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FFC72C] to-[#FFD947] px-6 py-3 font-bold text-[#5C068C] hover:shadow-lg hover:shadow-[#FFC72C]/50 transition-all duration-200"
+            >
+              Join Recruiting Discord
+            </a>
+          </div>
+        </section>
 
         <form onSubmit={onSubmit} className="space-y-8">
           <section className="rounded-2xl border-2 border-[#FFC72C] bg-neutral-950 p-6 shadow-lg shadow-[#5C068C]/20">
