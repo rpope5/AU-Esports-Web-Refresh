@@ -33,6 +33,7 @@ SCHEDULE_WORKFLOW_ACTIONS: set[str] = {
     "reject",
     "archive",
 }
+GENERAL_GAME_SENTINELS: set[str] = {"general", "all"}
 PUBLISHER_ROLES: set[str] = {"coach", "head_coach", "admin"}
 
 
@@ -84,6 +85,9 @@ def _resolve_game_for_staff(
     required: bool = True,
 ) -> Game | None:
     normalized_slug = (game_slug or "").strip().lower()
+    if normalized_slug in GENERAL_GAME_SENTINELS:
+        normalized_slug = ""
+
     if normalized_slug:
         game = db.query(Game).filter(Game.slug == normalized_slug).first()
         if not game:
@@ -92,6 +96,9 @@ def _resolve_game_for_staff(
         return game
 
     normalized_game = (fallback_game or "").strip().lower()
+    if normalized_game in GENERAL_GAME_SENTINELS:
+        normalized_game = ""
+
     if normalized_game:
         game = (
             db.query(Game)
@@ -112,6 +119,17 @@ def _resolve_game_for_staff(
         raise HTTPException(status_code=400, detail="game_slug is required")
 
     return None
+
+
+def _ensure_general_scope(staff: StaffPrincipal, is_general: bool) -> None:
+    if not is_general:
+        return
+
+    if not staff.has_global_game_access:
+        raise HTTPException(
+            status_code=403,
+            detail="Only staff with global game access can create or edit General schedule items",
+        )
 
 
 def _ensure_event_scope(staff: StaffPrincipal, event: CalendarEvent) -> None:
@@ -211,13 +229,14 @@ def _serialize_public(
     game_slug: str | None,
     game_name: str | None,
 ) -> CalendarEventPublicOut:
+    resolved_game_name = (game_name or event.game or "").strip() or "General"
     return CalendarEventPublicOut(
         id=event.id,
         name=event.name,
         time=event.time,
-        game=event.game or game_name,
+        game=resolved_game_name,
         game_slug=game_slug,
-        game_name=game_name or event.game,
+        game_name=resolved_game_name,
         status=_normalize_status(event.status),
         created_at=event.created_at,
         updated_at=event.updated_at,
@@ -232,13 +251,14 @@ def _serialize_admin(
     approved_by_username: str | None,
     rejected_by_username: str | None,
 ) -> CalendarEventAdminOut:
+    resolved_game_name = (game_name or event.game or "").strip() or "General"
     return CalendarEventAdminOut(
         id=event.id,
         name=event.name,
         time=event.time,
-        game=event.game or game_name,
+        game=resolved_game_name,
         game_slug=game_slug,
-        game_name=game_name or event.game,
+        game_name=resolved_game_name,
         status=_normalize_status(event.status),
         created_at=event.created_at,
         updated_at=event.updated_at,
@@ -348,9 +368,14 @@ def list_schedule_events_admin(
     if status_filter:
         query = query.filter(CalendarEvent.status.in_(tuple(status_filter)))
     if game_slug:
-        game = _resolve_game_for_staff(db, staff, game_slug=game_slug, fallback_game=None, required=True)
-        if game:
-            query = query.filter(CalendarEvent.game_id == game.id)
+        normalized_filter = game_slug.strip().lower()
+        if normalized_filter in GENERAL_GAME_SENTINELS:
+            _ensure_general_scope(staff, True)
+            query = query.filter(CalendarEvent.game_id.is_(None))
+        else:
+            game = _resolve_game_for_staff(db, staff, game_slug=game_slug, fallback_game=None, required=True)
+            if game:
+                query = query.filter(CalendarEvent.game_id == game.id)
 
     rows = (
         query.order_by(CalendarEvent.time.asc(), CalendarEvent.id.asc())
@@ -381,10 +406,9 @@ def create_schedule_event(
         staff,
         game_slug=data.game_slug,
         fallback_game=data.game,
-        required=True,
+        required=False,
     )
-    if not game:
-        raise HTTPException(status_code=400, detail="Game is required")
+    _ensure_general_scope(staff, game is None)
 
     default_action = "submit_for_approval" if staff.role == "captain" else "publish"
     action = _coerce_workflow_action(data.workflow_action, default_action)
@@ -397,8 +421,8 @@ def create_schedule_event(
     event = CalendarEvent(
         name=data.name,
         time=data.time,
-        game=game.name,
-        game_id=game.id,
+        game=game.name if game else "General",
+        game_id=game.id if game else None,
         created_by_admin_id=staff.user_id,
     )
     _set_workflow_state(event, staff, action)
@@ -455,12 +479,11 @@ def update_schedule_event(
             staff,
             game_slug=update_data.get("game_slug"),
             fallback_game=update_data.get("game"),
-            required=True,
+            required=False,
         )
-        if not game:
-            raise HTTPException(status_code=400, detail="Game is required")
-        event.game_id = game.id
-        event.game = game.name
+        _ensure_general_scope(staff, game is None)
+        event.game_id = game.id if game else None
+        event.game = game.name if game else "General"
         has_update = True
     if "workflow_action" in update_data:
         if update_data.get("workflow_action") is None:

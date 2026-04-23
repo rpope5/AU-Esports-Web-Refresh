@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
 import { getContentPlaceholder, resolveContentImageUrl } from "@/lib/contentImages";
+import type { GameOption } from "@/types/GameOption";
 
 type AnnouncementState = "draft" | "pending_approval" | "published" | "rejected";
 
@@ -18,6 +19,9 @@ type Announcement = {
   state: AnnouncementState;
   game_slug: string | null;
   game_name: string | null;
+  game_slugs?: string[];
+  game_names?: string[];
+  is_general?: boolean;
   created_at: string;
   updated_at: string | null;
   created_by_admin_id: number | null;
@@ -30,19 +34,15 @@ type Announcement = {
 type CreateWorkflowAction = "save_draft" | "submit_for_approval" | "publish";
 type UpdateWorkflowAction = CreateWorkflowAction | "reject";
 
+type AnnouncementUpdatePayload = {
+  title?: string;
+  body?: string;
+  workflow_action?: UpdateWorkflowAction;
+  game_slugs?: string[];
+  is_general?: boolean;
+};
+
 const DEFAULT_NEWS_PLACEHOLDER = getContentPlaceholder("announcement");
-const ALL_GAME_OPTIONS = [
-  { slug: "valorant", name: "Valorant" },
-  { slug: "cs2", name: "Counter-Strike 2" },
-  { slug: "fortnite", name: "Fortnite" },
-  { slug: "r6", name: "Rainbow Six Siege" },
-  { slug: "rocket-league", name: "Rocket League" },
-  { slug: "overwatch", name: "Overwatch" },
-  { slug: "cod", name: "Call of Duty" },
-  { slug: "hearthstone", name: "Hearthstone" },
-  { slug: "smash", name: "Super Smash Bros. Ultimate" },
-  { slug: "mario-kart", name: "Mario Kart" },
-];
 
 function resolveImageUrl(imageUrl: string | null, apiUrl: string): string {
   return resolveContentImageUrl(imageUrl, apiUrl, "announcement");
@@ -78,16 +78,57 @@ function stateBadgeClasses(state: AnnouncementState): string {
   return "border-neutral-700 bg-neutral-900 text-neutral-300";
 }
 
+function normalizeGameSlugs(values: string[] | null | undefined): string[] {
+  if (!values || values.length === 0) return [];
+
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const rawValue of values) {
+    const value = rawValue.trim().toLowerCase();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
+function toggleSelection(current: string[], slug: string, checked: boolean): string[] {
+  if (checked) return normalizeGameSlugs([...current, slug]);
+  return current.filter((item) => item !== slug);
+}
+
+function getAnnouncementGameSlugs(item: Announcement): string[] {
+  const normalized = normalizeGameSlugs(item.game_slugs);
+  if (normalized.length > 0) return normalized;
+  return item.game_slug ? [item.game_slug] : [];
+}
+
+function dedupeTagLabels(labels: string[]): string[] {
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const rawLabel of labels) {
+    const trimmed = rawLabel.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(key === "general" ? "General" : trimmed);
+  }
+  return deduped;
+}
+
 export default function AdminNewsPage() {
   const router = useRouter();
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const [me, setMe] = useState<AdminSession | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [allGames, setAllGames] = useState<GameOption[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [selectedGameSlug, setSelectedGameSlug] = useState("");
+  const [selectedGameSlugs, setSelectedGameSlugs] = useState<string[]>([]);
+  const [isGeneralSelected, setIsGeneralSelected] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -95,6 +136,8 @@ export default function AdminNewsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
+  const [editGameSlugs, setEditGameSlugs] = useState<string[]>([]);
+  const [editIsGeneral, setEditIsGeneral] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -112,18 +155,39 @@ export default function AdminNewsPage() {
   const canDeleteAnnouncements = Boolean(me?.permissions.can_delete_announcements);
   const role = me?.role || "";
   const canPublishAnnouncements = role === "coach" || role === "head_coach" || role === "admin";
+  const canUseGeneralTag = Boolean(me?.has_global_game_access);
 
   const availableGames = useMemo(() => {
     if (!me) return [];
-    if (me.has_global_game_access) return ALL_GAME_OPTIONS;
-    return ALL_GAME_OPTIONS.filter((game) => me.allowed_game_slugs.includes(game.slug));
-  }, [me]);
+    if (me.has_global_game_access) return allGames;
+    return allGames.filter((game) => me.allowed_game_slugs.includes(game.slug));
+  }, [allGames, me]);
 
-  useEffect(() => {
-    if (!selectedGameSlug && availableGames.length > 0) {
-      setSelectedGameSlug(availableGames[0].slug);
-    }
-  }, [availableGames, selectedGameSlug]);
+  const gameNameBySlug = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const game of allGames) map.set(game.slug, game.name);
+    return map;
+  }, [allGames]);
+
+  const getAnnouncementTagLabels = useCallback(
+    (item: Announcement): string[] => {
+      const labels: string[] = [];
+      if (item.is_general) labels.push("General");
+
+      const slugs = getAnnouncementGameSlugs(item);
+      if (Array.isArray(item.game_names) && item.game_names.length > 0) {
+        labels.push(...item.game_names);
+      } else if (item.game_name) {
+        labels.push(item.game_name);
+      } else {
+        labels.push(...slugs.map((slug) => gameNameBySlug.get(slug) || slug));
+      }
+
+      if (labels.length === 0) return ["Unscoped"];
+      return dedupeTagLabels(labels);
+    },
+    [gameNameBySlug],
+  );
 
   const loadAnnouncements = useCallback(
     async (token: string) => {
@@ -148,7 +212,7 @@ export default function AdminNewsPage() {
         }
 
         const data = (await res.json()) as Announcement[];
-        setAnnouncements(data);
+        setAnnouncements(Array.isArray(data) ? data : []);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load announcements");
       } finally {
@@ -157,6 +221,17 @@ export default function AdminNewsPage() {
     },
     [apiUrl, router],
   );
+
+  const loadGames = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/games`);
+      if (!res.ok) throw new Error("Failed to load canonical games");
+      const data = (await res.json()) as GameOption[];
+      setAllGames(Array.isArray(data) ? data : []);
+    } catch {
+      setAllGames([]);
+    }
+  }, [apiUrl]);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -191,15 +266,15 @@ export default function AdminNewsPage() {
           return;
         }
 
-        await loadAnnouncements(token);
+        await Promise.all([loadAnnouncements(token), loadGames()]);
       } catch {
         setError("Failed to initialize announcements.");
         setLoadingAnnouncements(false);
       }
     };
 
-    init();
-  }, [apiUrl, loadAnnouncements, router]);
+    void init();
+  }, [apiUrl, loadAnnouncements, loadGames, router]);
 
   function canEditAnnouncement(item: Announcement): boolean {
     if (!me) return false;
@@ -227,8 +302,14 @@ export default function AdminNewsPage() {
       setError("Title and content are required.");
       return;
     }
-    if (!selectedGameSlug) {
-      setError("Please select a game.");
+
+    const normalizedSelectedSlugs = normalizeGameSlugs(selectedGameSlugs);
+    if (normalizedSelectedSlugs.length === 0 && !isGeneralSelected) {
+      setError("Select at least one game or enable General.");
+      return;
+    }
+    if (isGeneralSelected && !canUseGeneralTag) {
+      setError("General announcements require global game access.");
       return;
     }
 
@@ -247,8 +328,14 @@ export default function AdminNewsPage() {
       const formData = new FormData();
       formData.append("title", cleanTitle);
       formData.append("body", cleanBody);
-      formData.append("game_slug", selectedGameSlug);
       formData.append("workflow_action", action);
+      formData.append("is_general", String(isGeneralSelected));
+      if (normalizedSelectedSlugs.length === 1) {
+        formData.append("game_slug", normalizedSelectedSlugs[0]);
+      }
+      for (const slug of normalizedSelectedSlugs) {
+        formData.append("game_slugs", slug);
+      }
       if (imageFile) formData.append("image", imageFile);
 
       const res = await fetch(`${apiUrl}/api/v1/admin/news`, {
@@ -274,6 +361,8 @@ export default function AdminNewsPage() {
       setTitle("");
       setBody("");
       setImageFile(null);
+      setSelectedGameSlugs([]);
+      setIsGeneralSelected(false);
       setSuccess(
         action === "publish"
           ? "Announcement published."
@@ -291,7 +380,7 @@ export default function AdminNewsPage() {
 
   async function updateAnnouncement(
     announcementId: number,
-    payload: { title?: string; body?: string; workflow_action?: UpdateWorkflowAction },
+    payload: AnnouncementUpdatePayload,
   ): Promise<void> {
     const token = localStorage.getItem("au_admin_token");
     if (!token) {
@@ -385,12 +474,16 @@ export default function AdminNewsPage() {
     setEditingId(item.id);
     setEditTitle(item.title);
     setEditBody(item.body);
+    setEditGameSlugs(getAnnouncementGameSlugs(item));
+    setEditIsGeneral(Boolean(item.is_general));
   }
 
   function cancelEditing(): void {
     setEditingId(null);
     setEditTitle("");
     setEditBody("");
+    setEditGameSlugs([]);
+    setEditIsGeneral(false);
   }
 
   async function saveEdit(item: Announcement): Promise<void> {
@@ -401,8 +494,23 @@ export default function AdminNewsPage() {
       return;
     }
 
+    const normalizedEditSlugs = normalizeGameSlugs(editGameSlugs);
+    if (normalizedEditSlugs.length === 0 && !editIsGeneral) {
+      setError("Select at least one game or enable General.");
+      return;
+    }
+    if (editIsGeneral && !canUseGeneralTag) {
+      setError("General announcements require global game access.");
+      return;
+    }
+
     try {
-      await updateAnnouncement(item.id, { title: cleanTitle, body: cleanBody });
+      await updateAnnouncement(item.id, {
+        title: cleanTitle,
+        body: cleanBody,
+        game_slugs: normalizedEditSlugs,
+        is_general: editIsGeneral,
+      });
       cancelEditing();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update announcement");
@@ -486,28 +594,61 @@ export default function AdminNewsPage() {
             <span className="rounded-full border border-neutral-700 px-2 py-0.5">
               Available games: {availableGames.length}
             </span>
+            <span className="rounded-full border border-neutral-700 px-2 py-0.5">
+              General access: {canUseGeneralTag ? "Enabled" : "Global roles only"}
+            </span>
           </div>
 
           <form className="mt-4 grid gap-4">
             <div>
-              <label className="text-sm text-neutral-300">Game</label>
-              <select
-                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-                value={selectedGameSlug}
-                onChange={(e) => setSelectedGameSlug(e.target.value)}
-                disabled={availableGames.length === 0 || submitting}
-                required
-              >
-                {availableGames.length === 0 ? (
-                  <option value="">No game access assigned</option>
-                ) : (
-                  availableGames.map((game) => (
-                    <option key={game.slug} value={game.slug}>
-                      {game.name}
-                    </option>
-                  ))
+              <label className="text-sm text-neutral-300">Announcement Scope</label>
+              <div className="mt-2 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+                <label className="flex items-center gap-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={isGeneralSelected}
+                    disabled={submitting || !canUseGeneralTag}
+                    onChange={(event) => setIsGeneralSelected(event.target.checked)}
+                  />
+                  <span>General (site-wide, not tied to one game)</span>
+                </label>
+                {!canUseGeneralTag && (
+                  <p className="mt-1 text-xs text-neutral-500">
+                    General announcements are limited to staff with global game access.
+                  </p>
                 )}
-              </select>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {availableGames.length === 0 ? (
+                    <p className="text-xs text-neutral-500">
+                      No game access assigned. Enable General or ask an admin to assign game scope.
+                    </p>
+                  ) : (
+                    availableGames.map((game) => {
+                      const isChecked = selectedGameSlugs.includes(game.slug);
+                      return (
+                        <label
+                          key={game.slug}
+                          className="flex items-center gap-2 rounded border border-neutral-800 bg-black/40 px-2 py-1.5 text-xs text-neutral-300"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={submitting}
+                            onChange={(event) =>
+                              setSelectedGameSlugs((prev) => toggleSelection(prev, game.slug, event.target.checked))
+                            }
+                          />
+                          <span>{game.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Choose one or more games, General, or both.
+                </p>
+              </div>
             </div>
 
             <div>
@@ -549,7 +690,7 @@ export default function AdminNewsPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={submitting || availableGames.length === 0}
+                disabled={submitting}
                 onClick={() => submitAnnouncement("save_draft")}
                 className="rounded-lg border border-neutral-700 px-4 py-2 text-sm disabled:opacity-60"
               >
@@ -557,7 +698,7 @@ export default function AdminNewsPage() {
               </button>
               <button
                 type="button"
-                disabled={submitting || availableGames.length === 0}
+                disabled={submitting}
                 onClick={() => submitAnnouncement("submit_for_approval")}
                 className="rounded-lg border border-amber-700/80 bg-amber-900/30 px-4 py-2 text-sm text-amber-100 disabled:opacity-60"
               >
@@ -566,7 +707,7 @@ export default function AdminNewsPage() {
               {canPublishAnnouncements && (
                 <button
                   type="button"
-                  disabled={submitting || availableGames.length === 0}
+                  disabled={submitting}
                   onClick={() => submitAnnouncement("publish")}
                   className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
                 >
@@ -610,6 +751,7 @@ export default function AdminNewsPage() {
               const canSubmit = canSubmitAnnouncement(item);
               const canPublish = canPublishAnnouncements && item.state !== "published";
               const canReject = canPublishAnnouncements && item.state === "pending_approval";
+              const tagLabels = getAnnouncementTagLabels(item);
 
               return (
                 <article
@@ -678,6 +820,52 @@ export default function AdminNewsPage() {
                             onChange={(event) => setEditBody(event.target.value)}
                           />
                         </div>
+                        <div>
+                          <label className="text-sm text-neutral-300">Announcement Scope</label>
+                          <div className="mt-1 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+                            <label className="flex items-center gap-2 text-sm text-neutral-200">
+                              <input
+                                type="checkbox"
+                                checked={editIsGeneral}
+                                disabled={isBusy || !canUseGeneralTag}
+                                onChange={(event) => setEditIsGeneral(event.target.checked)}
+                              />
+                              <span>General (site-wide)</span>
+                            </label>
+                            {!canUseGeneralTag && (
+                              <p className="mt-1 text-xs text-neutral-500">
+                                General announcements are limited to staff with global game access.
+                              </p>
+                            )}
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              {availableGames.length === 0 ? (
+                                <p className="text-xs text-neutral-500">No game access assigned.</p>
+                              ) : (
+                                availableGames.map((game) => {
+                                  const isChecked = editGameSlugs.includes(game.slug);
+                                  return (
+                                    <label
+                                      key={`${item.id}-${game.slug}`}
+                                      className="flex items-center gap-2 rounded border border-neutral-800 bg-black/40 px-2 py-1.5 text-xs text-neutral-300"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        disabled={isBusy}
+                                        onChange={(event) =>
+                                          setEditGameSlugs((prev) =>
+                                            toggleSelection(prev, game.slug, event.target.checked),
+                                          )
+                                        }
+                                      />
+                                      <span>{game.name}</span>
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -686,7 +874,7 @@ export default function AdminNewsPage() {
                         ID: {item.id}
                       </span>
                       <span className="rounded-full border border-neutral-700 px-2 py-0.5">
-                        Game: {item.game_name || item.game_slug || "Unknown"}
+                        Tags: {tagLabels.join(", ")}
                       </span>
                       <span className="rounded-full border border-neutral-700 px-2 py-0.5">
                         Author: {item.created_by_username || "Unknown"}
