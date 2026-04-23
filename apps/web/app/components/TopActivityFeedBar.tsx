@@ -143,7 +143,7 @@ export default function TopActivityFeedBar() {
           <div className="match-bar">
             <button
               type="button"
-              className="match-arrow"
+              className="match-arrow shrink-0"
               onClick={prevItems}
               disabled={!canMoveLeft}
               aria-label="Show earlier items"
@@ -151,43 +151,45 @@ export default function TopActivityFeedBar() {
               &larr;
             </button>
 
-            <div className="match-list">
-              {loading ? (
-                <div className="match-item">
-                  <div className="match-teams">
-                    <span className="team-name">Loading activity...</span>
-                  </div>
-                  <div className="match-game">Please wait</div>
-                  <div className="match-time">Refreshing schedule events</div>
-                </div>
-              ) : visibleItems.length > 0 ? (
-                visibleItems.map((item) => {
-                  const subtitle = item.subtitle || "Scheduled event";
-
-                  return (
-                    <div className="match-item" key={item.id} title={item.title}>
-                      <div className="match-teams">
-                        <span className="team-name match-title">{item.title}</span>
-                      </div>
-                      <div className="match-game">{subtitle}</div>
-                      <div className="match-time">{item.displayDate}</div>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="match-list">
+                {loading ? (
+                  <div className="match-item">
+                    <div className="match-teams">
+                      <span className="team-name">Loading activity...</span>
                     </div>
-                  );
-                })
-              ) : (
-                <div className="match-item">
-                  <div className="match-teams">
-                    <span className="team-name">No schedule events yet</span>
+                    <div className="match-game">Please wait</div>
+                    <div className="match-time">Refreshing schedule events</div>
                   </div>
-                  <div className="match-game">Schedule feed</div>
-                  <div className="match-time">Check back soon</div>
-                </div>
-              )}
+                ) : visibleItems.length > 0 ? (
+                  visibleItems.map((item) => {
+                    const subtitle = item.subtitle || "Scheduled event";
+
+                    return (
+                      <div className="match-item" key={item.id} title={item.title}>
+                        <div className="match-teams">
+                          <span className="team-name match-title">{item.title}</span>
+                        </div>
+                        <div className="match-game">{subtitle}</div>
+                        <div className="match-time">{item.displayDate}</div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="match-item">
+                    <div className="match-teams">
+                      <span className="team-name">No schedule events yet</span>
+                    </div>
+                    <div className="match-game">Schedule feed</div>
+                    <div className="match-time">Check back soon</div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
               type="button"
-              className="match-arrow"
+              className="match-arrow shrink-0"
               onClick={nextItems}
               disabled={!canMoveRight}
               aria-label="Show later items"
