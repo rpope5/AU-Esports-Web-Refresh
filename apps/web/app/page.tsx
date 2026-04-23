@@ -52,15 +52,15 @@ function TwitterFeed() {
   }, [page, loading, hasMore]);
 
   return (
-    <div className="flex flex-col items-center">
-      <h2 className="text-[#FFC72C] font-bold mb-2 text-center">
+    <div className="flex w-full flex-col">
+      <h2 className="mb-2 text-center text-3xl font-bold text-[#FFC72C] md:text-4xl">
         Latest Posts
       </h2>
-      <div className="twitter-box h-[600px] w-[250px] border-2 border-[#FFC72C] rounded-md overflow-hidden p-3">
+      <div className="twitter-box flex h-[26rem] w-full min-w-0 flex-col overflow-hidden rounded-md border-2 border-[#FFC72C] p-3 sm:h-[30rem] lg:h-[34rem] xl:h-[37.5rem]">
 
         <div
           id="twitter-scroll"
-          className="flex flex-col gap-3 overflow-y overflow-x-hidden h-[560px] pr-1"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto pr-1"
         >
           {tweets.length === 0 && !loading && (
             <p className="text-gray-400 text-sm text-center">Loading...</p>
@@ -73,18 +73,18 @@ function TwitterFeed() {
                 dangerouslySetInnerHTML={{ __html: tweet.title }}
               />
 
-              <div className="flex justify-between items-center mt-2">
+              <div className="mt-2 flex items-center justify-between">
                 <a
                   href={tweet.link}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#FFC72C] text-xs hover:underline"
+                  className="text-xs text-[#FFC72C] hover:underline"
                 >
-                  View Post →
+                  View Post -&gt;
                 </a>
 
                 {tweet.pubDate && (
-                  <span className="text-gray-500 text-xs">
+                  <span className="text-xs text-gray-500">
                     {new Date(tweet.pubDate).toLocaleDateString()}
                   </span>
                 )}
@@ -194,7 +194,7 @@ export default function Home() {
     <div className="min-h-screen bg-black text-white">
       <TopActivityFeedBar />
 
-      <header className="site-header flex flex-col md:flex-row items-center justify-between p-4 gap-4">
+      <header className="site-header flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
 
         <div className="flex items-center gap-2">
           <Image
@@ -202,11 +202,11 @@ export default function Home() {
             alt="Ashland Eagle Logo"
             width={90}
             height={90}
-            className="w-14 h-14 md:w-20 md:h-20 object-contain"
+            className="h-14 w-14 object-contain md:h-20 md:w-20"
           />
 
-          <div className="flex items-center gap-3">
-            <h1 className="title title-3d text-lg md:text-2xl font-bold tracking-wide">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="title title-3d text-lg font-bold leading-tight tracking-wide md:text-2xl">
               Ashland University Esports
             </h1>
 
@@ -216,7 +216,7 @@ export default function Home() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFC72C] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-[#FFC72C]"></span>
                 </span>
-                <span className="text-[#FFC72C] text-sm font-semibold">
+                <span className="text-sm font-semibold text-[#FFC72C]">
                   LIVE
                 </span>
               </div>
@@ -224,7 +224,7 @@ export default function Home() {
           </div>
         </div>
 
-        <nav className="nav-buttons flex flex-wrap justify-center gap-6 text-sm md:text-base">
+        <nav className="nav-buttons flex flex-wrap justify-center gap-4 text-sm md:gap-6 md:text-base">
           {pages.map((page) => (
             <Link key={page} href={pageMap[page] || "/"} className="relative group">
               {page}
@@ -237,12 +237,49 @@ export default function Home() {
 
       <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-[#FFC72C] to-transparent opacity-70"></div>
 
-      <main className="flex justify-between items-start px-10 py-10 gap-6">
+      <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] xl:grid-cols-[minmax(180px,220px)_minmax(0,1fr)_minmax(260px,320px)]">
+          <div className="main-content order-1 md:row-span-2 xl:order-2 xl:row-span-1">
+            <div className="video-container">
+              <video
+                src="/CS2.mp4"
+                autoPlay
+                loop
+                muted
+                className="h-full w-full rounded-lg object-cover"
+              />
+            </div>
 
-        <aside className="leagues-aside">
-          <div className="text-xl mb-4">Leagues</div>
+            <div className="jersey-box">
+              <h2>Get Your Jersey</h2>
+              <p>Show your support for Ashland Esports</p>
 
-          <div className="league-carousel overflow-hidden h-48">
+              <div className="mt-4 flex w-full flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+                <a
+                  href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
+                  className="shop-btn"
+                >
+                  <img src="/crit.png" alt="Crit Apparel shop" className="w-40 max-w-full" />
+                </a>
+
+                <a
+                  href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
+                  className="shop-btn-alt"
+                >
+                  <img src="/jersey.png" alt="Ashland jersey shop" className="w-40 max-w-full" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="order-2 md:col-start-2 md:row-start-2 xl:order-3 xl:col-start-3 xl:row-start-1">
+            <TwitterFeed />
+          </div>
+
+          <aside className="leagues-aside order-3 md:col-start-2 md:row-start-1 xl:order-1 xl:col-start-1">
+            <div className="mb-4 text-3xl md:text-4xl">Leagues</div>
+
+            <div className="league-carousel overflow-hidden">
             <div
               className="carousel-track"
               style={{ transform: `translateY(-${currentConfIndex * 12}rem)` }}
@@ -253,9 +290,9 @@ export default function Home() {
                   onClick={() =>
                     setSelectedConf(conferences[idx % conferences.length])
                   }
-                  className={`league-card h-48 ${selectedConf === conf ? "selected" : ""}`}
+                  className={`league-card ${selectedConf === conf ? "selected" : ""}`}
                 >
-                  <span className="mb-3 text-black text-lg font-Gotham-Bold">
+                  <span className="mb-3 text-lg font-Gotham-Bold text-black">
                     {conf}
                   </span>
                   <Image
@@ -263,51 +300,14 @@ export default function Home() {
                     alt={conf}
                     width={112}
                     height={112}
-                    className="w-28 h-28 object-contain"
+                    className="h-28 w-28 object-contain"
                   />
                 </div>
               ))}
             </div>
-          </div>
-        </aside>
-
-        <div className="main-content">
-
-          <div className="video-container">
-            <video
-              src="/CS2.mp4"
-              autoPlay
-              loop
-              muted
-              className="w-full h-full object-cover rounded-lg"
-            />
-          </div>
-
-          <div className="jersey-box">
-            <h2>Get Your Jersey</h2>
-            <p>Show your support for Ashland Esports</p>
-
-            <div className="flex justify-between items-center mt-4">
-              <a
-                href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
-                className="shop-btn"
-              >
-                <img src="/crit.png" className="w-40" />
-              </a>
-
-              <a
-                href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
-                className="shop-btn-alt"
-              >
-                <img src="/jersey.png" className="w-40" />
-              </a>
             </div>
-
-          </div>
+          </aside>
         </div>
-
-        <TwitterFeed />
-
       </main>
     </div>
   );
