@@ -7,6 +7,8 @@ type CalendarEvent = {
   name: string;
   time: string;
   game: string | null;
+  game_slug: string | null;
+  game_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -58,6 +60,10 @@ function formatEventTime(raw: string): string {
     minute: "2-digit",
     timeZoneName: "short",
   });
+}
+
+function formatEventGame(event: CalendarEvent): string {
+  return event.game_name || event.game || event.game_slug || "General";
 }
 
 export default function ScheduleCalendar() {
@@ -255,8 +261,8 @@ export default function ScheduleCalendar() {
                 <span className="font-semibold text-[#FFC72C]">Time:</span> {formatEventTime(activeEvent.time)}
               </p>
               <p>
-                <span className="font-semibold text-[#FFC72C]">Game:</span>{" "}
-                {activeEvent.game && activeEvent.game.trim() ? activeEvent.game : "N/A"}
+                <span className="font-semibold text-[#FFC72C]">Type:</span>{" "}
+                {formatEventGame(activeEvent)}
               </p>
             </div>
           </div>

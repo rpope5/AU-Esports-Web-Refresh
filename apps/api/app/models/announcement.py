@@ -1,8 +1,26 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
+
+announcement_games = Table(
+    "announcement_games",
+    Base.metadata,
+    Column(
+        "announcement_id",
+        Integer,
+        ForeignKey("esports_announcements.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "game_id",
+        Integer,
+        ForeignKey("games.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class EsportsAnnouncement(Base):
@@ -19,6 +37,7 @@ class EsportsAnnouncement(Base):
         nullable=True,
         index=True,
     )
+    is_general = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
         DateTime,
@@ -37,3 +56,6 @@ class EsportsAnnouncement(Base):
         ForeignKey("admin_users.id"),
         nullable=True,
     )
+
+    primary_game = relationship("Game", foreign_keys=[game_id], lazy="joined")
+    games = relationship("Game", secondary=announcement_games, lazy="selectin", order_by="Game.name")

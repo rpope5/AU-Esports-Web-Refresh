@@ -7,10 +7,11 @@ import { fetchSiteActivityFeed, type SiteActivityFeedItem } from "@/lib/siteActi
 
 function resolveVisibleCount(viewportWidth: number): number {
   if (viewportWidth >= 1750) return 6;
-  if (viewportWidth >= 1280) return 5;
-  if (viewportWidth >= 1024) return 4;
-  if (viewportWidth >= 768) return 3;
-  return 2;
+  if (viewportWidth >= 1400) return 5;
+  if (viewportWidth >= 1200) return 4;
+  if (viewportWidth >= 900) return 3;
+  if (viewportWidth >= 640) return 2;
+  return 1;
 }
 
 function parseItemTime(item: SiteActivityFeedItem): Date | null {
@@ -132,70 +133,72 @@ export default function TopActivityFeedBar() {
   const nextItems = () => setManualStartIndex(Math.min(maxStartIndex, clampedStartIndex + 1));
 
   return (
-    <div className="grid grid-cols-3 items-center w-full px-4">
-      <div className="justify-self-start">
-        <Header />
-      </div>
+    <div className="w-full bg-black px-3 py-2 sm:px-4">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4 xl:grid xl:grid-cols-[minmax(160px,1fr)_minmax(0,980px)_minmax(160px,1fr)] xl:items-center">
+        <div className="md:flex-shrink-0 xl:justify-self-start">
+          <Header />
+        </div>
 
-      <div className="justify-self-center min-w-0 w-full">
-        <div className="match-bar inline-flex items-center">
-          <button
-            type="button"
-            className="match-arrow"
-            onClick={prevItems}
-            disabled={!canMoveLeft}
-            aria-label="Show earlier items"
-          >
-            &larr;
-          </button>
+        <div className="min-w-0 w-full md:max-w-[980px] md:flex-1 xl:col-start-2 xl:max-w-none">
+          <div className="match-bar">
+            <button
+              type="button"
+              className="match-arrow shrink-0"
+              onClick={prevItems}
+              disabled={!canMoveLeft}
+              aria-label="Show earlier items"
+            >
+              &larr;
+            </button>
 
-          <div className="match-list">
-            {loading ? (
-              <div className="match-item">
-                <div className="match-teams">
-                  <span className="team-name">Loading activity...</span>
-                </div>
-                <div className="match-game">Please wait</div>
-                <div className="match-time">Refreshing schedule events</div>
-              </div>
-            ) : visibleItems.length > 0 ? (
-              visibleItems.map((item) => {
-                const subtitle = item.subtitle || "Scheduled event";
-
-                return (
-                  <div className="match-item" key={item.id} title={item.title}>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="match-list">
+                {loading ? (
+                  <div className="match-item">
                     <div className="match-teams">
-                      <span className="team-name match-title">{item.title}</span>
+                      <span className="team-name">Loading activity...</span>
                     </div>
-                    <div className="match-game">{subtitle}</div>
-                    <div className="match-time">{item.displayDate}</div>
+                    <div className="match-game">Please wait</div>
+                    <div className="match-time">Refreshing schedule events</div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="match-item">
-                <div className="match-teams">
-                  <span className="team-name">No schedule events yet</span>
-                </div>
-                <div className="match-game">Schedule feed</div>
-                <div className="match-time">Check back soon</div>
-              </div>
-            )}
-          </div>
+                ) : visibleItems.length > 0 ? (
+                  visibleItems.map((item) => {
+                    const subtitle = item.subtitle || "Scheduled event";
 
-          <button
-            type="button"
-            className="match-arrow"
-            onClick={nextItems}
-            disabled={!canMoveRight}
-            aria-label="Show later items"
-          >
-            &rarr;
-          </button>
+                    return (
+                      <div className="match-item" key={item.id} title={item.title}>
+                        <div className="match-teams">
+                          <span className="team-name match-title">{item.title}</span>
+                        </div>
+                        <div className="match-game">{subtitle}</div>
+                        <div className="match-time">{item.displayDate}</div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="match-item">
+                    <div className="match-teams">
+                      <span className="team-name">No schedule events yet</span>
+                    </div>
+                    <div className="match-game">Schedule feed</div>
+                    <div className="match-time">Check back soon</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="match-arrow shrink-0"
+              onClick={nextItems}
+              disabled={!canMoveRight}
+              aria-label="Show later items"
+            >
+              &rarr;
+            </button>
+          </div>
         </div>
       </div>
-
-      <div />
     </div>
   );
 }
