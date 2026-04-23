@@ -51,7 +51,7 @@ def upgrade() -> None:
     if _table_exists(bind, "esports_announcements") and _column_exists(bind, "esports_announcements", "is_general"):
         op.execute(
             sa.text(
-                "UPDATE esports_announcements SET is_general = 0 WHERE is_general IS NULL"
+                "UPDATE esports_announcements SET is_general = FALSE WHERE is_general IS NULL"
             )
         )
 
