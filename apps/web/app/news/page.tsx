@@ -11,6 +11,11 @@ type Announcement = {
   title: string;
   body: string;
   image_url: string | null;
+  game_slug?: string | null;
+  game_name?: string | null;
+  game_slugs?: string[];
+  game_names?: string[];
+  is_general?: boolean;
   created_at: string;
   updated_at: string | null;
 };
@@ -30,6 +35,33 @@ function formatPostedDate(rawValue: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+function getScopeLabels(item: Announcement): string[] {
+  const labels: string[] = [];
+  if (item.is_general) labels.push("General");
+
+  if (Array.isArray(item.game_names) && item.game_names.length > 0) {
+    labels.push(...item.game_names);
+  } else if (item.game_name) {
+    labels.push(item.game_name);
+  } else if (Array.isArray(item.game_slugs) && item.game_slugs.length > 0) {
+    labels.push(...item.game_slugs);
+  } else if (item.game_slug) {
+    labels.push(item.game_slug);
+  }
+
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const rawLabel of labels) {
+    const trimmed = rawLabel.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(key === "general" ? "General" : trimmed);
+  }
+  return deduped;
 }
 
 export default function NewsPage() {
@@ -202,6 +234,7 @@ export default function NewsPage() {
                   <p className="mt-2 text-sm text-neutral-300">
                     Posted {formatPostedDate(featuredAnnouncement.created_at)}
                   </p>
+                  
                   <p className="mt-5 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-neutral-100 md:text-base">
                     {featuredAnnouncement.body}
                   </p>
@@ -235,6 +268,11 @@ export default function NewsPage() {
                             {formatPostedDate(item.created_at)}
                           </p>
                           <h4 className="mt-2 text-xl font-semibold">{item.title}</h4>
+                          {getScopeLabels(item).length > 0 && (
+                            <p className="mt-1 text-xs uppercase tracking-wide text-neutral-400">
+                              {getScopeLabels(item).join(" | ")}
+                            </p>
+                          )}
                           <button
                             type="button"
                             className="mt-3 text-sm text-neutral-300 transition-colors hover:text-white"

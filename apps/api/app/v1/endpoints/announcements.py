@@ -2,7 +2,8 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, aliased, selectinload
 
 from app.core.config import get_settings
 from app.core.deps import (
@@ -57,12 +58,124 @@ def _can_publish(staff: StaffPrincipal) -> bool:
     return staff.role in PUBLISHER_ROLES
 
 
-def _ensure_announcement_scope(staff: StaffPrincipal, announcement: EsportsAnnouncement) -> None:
+def _normalize_requested_game_slugs(
+    game_slug: str | None,
+    game_slugs: list[str] | None,
+) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    raw_values: list[str] = []
+    if game_slug is not None:
+        raw_values.append(game_slug)
+    if game_slugs:
+        raw_values.extend(game_slugs)
+
+    for raw_value in raw_values:
+        slug = raw_value.strip().lower()
+        if not slug or slug in seen:
+            continue
+        seen.add(slug)
+        normalized.append(slug)
+
+    return normalized
+
+
+def _resolve_games_for_staff(
+    db: Session,
+    staff: StaffPrincipal,
+    game_slugs: list[str],
+) -> list[Game]:
+    if not game_slugs:
+        return []
+
+    games = db.query(Game).filter(Game.slug.in_(tuple(game_slugs))).all()
+    games_by_slug = {game.slug: game for game in games if game.slug}
+
+    missing_slugs = [slug for slug in game_slugs if slug not in games_by_slug]
+    if missing_slugs:
+        raise HTTPException(status_code=404, detail=f"Games not found: {', '.join(missing_slugs)}")
+
+    ordered_games = [games_by_slug[slug] for slug in game_slugs]
+    for game in ordered_games:
+        ensure_game_access(staff, game.id)
+    return ordered_games
+
+
+def _resolve_public_game_by_slug(db: Session, game_slug: str) -> Game:
+    normalized_slug = game_slug.strip().lower()
+    if not normalized_slug:
+        raise HTTPException(status_code=400, detail="game_slug is required")
+
+    game = db.query(Game).filter(Game.slug == normalized_slug).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return game
+
+
+def _announcement_game_entries(item: EsportsAnnouncement) -> list[tuple[str, str, int]]:
+    entries: list[tuple[str, str, int]] = []
+    seen_game_ids: set[int] = set()
+
+    def add_game(game: Game | None) -> None:
+        if not game or game.id is None or not game.slug:
+            return
+
+        game_id = int(game.id)
+        if game_id in seen_game_ids:
+            return
+
+        seen_game_ids.add(game_id)
+        entries.append((game.slug, game.name or game.slug, game_id))
+
+    add_game(item.primary_game)
+    for game in item.games:
+        add_game(game)
+
+    return entries
+
+
+def _announcement_game_ids(item: EsportsAnnouncement) -> set[int]:
+    game_ids = {game_id for _slug, _name, game_id in _announcement_game_entries(item)}
+    if item.game_id is not None:
+        game_ids.add(int(item.game_id))
+    for game in item.games:
+        if game.id is not None:
+            game_ids.add(int(game.id))
+    return game_ids
+
+
+def _can_staff_access_announcement(staff: StaffPrincipal, announcement: EsportsAnnouncement) -> bool:
     if staff.has_global_game_access:
+        return True
+
+    # General announcements are intentionally global-only to preserve existing scoped permissions.
+    if bool(announcement.is_general):
+        return False
+
+    game_ids = _announcement_game_ids(announcement)
+    if not game_ids:
+        return False
+
+    return game_ids.issubset(staff.allowed_game_ids)
+
+
+def _ensure_general_scope(staff: StaffPrincipal, is_general: bool) -> None:
+    if not is_general:
         return
-    if announcement.game_id is None:
-        raise HTTPException(status_code=403, detail="Forbidden for this announcement")
-    ensure_game_access(staff, announcement.game_id)
+
+    # General announcements are intentionally global-only to preserve existing scoped permissions.
+    if not staff.has_global_game_access:
+        raise HTTPException(
+            status_code=403,
+            detail="Only staff with global game access can use the General tag",
+        )
+
+
+def _ensure_announcement_scope(staff: StaffPrincipal, announcement: EsportsAnnouncement) -> None:
+    if _can_staff_access_announcement(staff, announcement):
+        return
+    raise HTTPException(status_code=403, detail="Forbidden for this announcement")
 
 
 def _ensure_can_edit(staff: StaffPrincipal, announcement: EsportsAnnouncement) -> None:
@@ -130,28 +243,29 @@ def _build_admin_query(db: Session):
             EsportsAnnouncement,
             creator.username,
             approver.username,
-            Game.slug,
-            Game.name,
         )
         .outerjoin(creator, creator.id == EsportsAnnouncement.created_by_admin_id)
         .outerjoin(approver, approver.id == EsportsAnnouncement.approved_by_admin_id)
-        .outerjoin(Game, Game.id == EsportsAnnouncement.game_id)
+        .options(selectinload(EsportsAnnouncement.games))
     )
 
 
-def _serialize_public(
-    item: EsportsAnnouncement,
-    game_slug: str | None,
-    game_name: str | None,
-) -> AnnouncementPublicOut:
+def _serialize_public(item: EsportsAnnouncement) -> AnnouncementPublicOut:
+    game_entries = _announcement_game_entries(item)
+    primary_slug = game_entries[0][0] if game_entries else None
+    primary_name = game_entries[0][1] if game_entries else None
+
     return AnnouncementPublicOut(
         id=item.id,
         title=item.title,
         body=item.body,
         image_url=item.image_path,
         state=_normalize_state(item.state),
-        game_slug=game_slug,
-        game_name=game_name,
+        game_slug=primary_slug,
+        game_name=primary_name,
+        game_slugs=[slug for slug, _name, _game_id in game_entries],
+        game_names=[name for _slug, name, _game_id in game_entries],
+        is_general=bool(item.is_general),
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -161,19 +275,10 @@ def _serialize_admin(
     item: EsportsAnnouncement,
     created_by_username: str | None,
     approved_by_username: str | None,
-    game_slug: str | None,
-    game_name: str | None,
 ) -> AnnouncementAdminOut:
+    public_payload = _serialize_public(item)
     return AnnouncementAdminOut(
-        id=item.id,
-        title=item.title,
-        body=item.body,
-        image_url=item.image_path,
-        state=_normalize_state(item.state),
-        game_slug=game_slug,
-        game_name=game_name,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
+        **public_payload.model_dump(),
         created_by_admin_id=item.created_by_admin_id,
         created_by_username=created_by_username,
         approved_by_admin_id=item.approved_by_admin_id,
@@ -185,7 +290,7 @@ def _serialize_admin(
 def _fetch_admin_announcement(
     db: Session,
     announcement_id: int,
-) -> tuple[EsportsAnnouncement, str | None, str | None, str | None, str | None] | None:
+) -> tuple[EsportsAnnouncement, str | None, str | None] | None:
     return (
         _build_admin_query(db)
         .filter(EsportsAnnouncement.id == announcement_id)
@@ -193,23 +298,26 @@ def _fetch_admin_announcement(
     )
 
 
-def _resolve_game_for_staff(db: Session, staff: StaffPrincipal, game_slug: str) -> Game:
-    normalized_slug = game_slug.strip().lower()
-    if not normalized_slug:
-        raise HTTPException(status_code=400, detail="game_slug is required")
-
-    game = db.query(Game).filter(Game.slug == normalized_slug).first()
+def _apply_public_game_filter(query, game: Game | None):
     if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-    ensure_game_access(staff, game.id)
-    return game
+        return query
+
+    return query.filter(
+        or_(
+            EsportsAnnouncement.is_general.is_(True),
+            EsportsAnnouncement.game_id == game.id,
+            EsportsAnnouncement.games.any(Game.id == game.id),
+        )
+    )
 
 
 @router.post("/admin/news", response_model=AnnouncementAdminOut)
 def create_announcement(
     title: str = Form(..., min_length=1, max_length=255),
     body: str = Form(..., min_length=1),
-    game_slug: str = Form(..., min_length=1),
+    game_slug: str | None = Form(default=None),
+    game_slugs: list[str] | None = Form(default=None),
+    is_general: bool = Form(default=False),
     workflow_action: str | None = Form(default=None),
     image: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
@@ -222,7 +330,16 @@ def create_announcement(
     if not clean_body:
         raise HTTPException(status_code=400, detail="Body is required")
 
-    game = _resolve_game_for_staff(db, staff, game_slug)
+    _ensure_general_scope(staff, is_general)
+
+    requested_game_slugs = _normalize_requested_game_slugs(game_slug, game_slugs)
+    selected_games = _resolve_games_for_staff(db, staff, requested_game_slugs)
+    if not selected_games and not is_general:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one game must be selected when General is not enabled",
+        )
+
     image_path = _save_uploaded_image(image) if image and image.filename else None
 
     default_action = "save_draft" if staff.role == "captain" else "publish"
@@ -234,9 +351,11 @@ def create_announcement(
         title=clean_title,
         body=clean_body,
         image_path=image_path,
-        game_id=game.id,
+        game_id=selected_games[0].id if selected_games else None,
+        is_general=is_general,
         created_by_admin_id=staff.user_id,
     )
+    announcement.games = selected_games
     _set_workflow_state(announcement, staff, action)
 
     db.add(announcement)
@@ -246,14 +365,8 @@ def create_announcement(
     row = _fetch_admin_announcement(db, announcement.id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, row_game_slug, row_game_name = row
-    return _serialize_admin(
-        item,
-        creator_username,
-        approver_username,
-        row_game_slug,
-        row_game_name,
-    )
+    item, creator_username, approver_username = row
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.get("/admin/news", response_model=list[AnnouncementAdminOut])
@@ -266,17 +379,31 @@ def list_announcements_admin(
     if not staff.has_global_game_access:
         if not staff.allowed_game_ids:
             return []
-        query = query.filter(EsportsAnnouncement.game_id.in_(tuple(staff.allowed_game_ids)))
 
+        allowed_game_ids = tuple(staff.allowed_game_ids)
+        query = query.filter(
+            or_(
+                EsportsAnnouncement.game_id.in_(allowed_game_ids),
+                EsportsAnnouncement.games.any(Game.id.in_(allowed_game_ids)),
+            )
+        )
+
+    fetch_limit = limit if staff.has_global_game_access else min(max(limit * 5, limit), 2000)
     rows = (
         query.order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
-        .limit(limit)
+        .limit(fetch_limit)
         .all()
     )
-    return [
-        _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
-        for item, creator_username, approver_username, game_slug, game_name in rows
-    ]
+
+    items: list[AnnouncementAdminOut] = []
+    for item, creator_username, approver_username in rows:
+        if not _can_staff_access_announcement(staff, item):
+            continue
+        items.append(_serialize_admin(item, creator_username, approver_username))
+        if len(items) >= limit:
+            break
+
+    return items
 
 
 @router.get("/admin/news/{announcement_id}", response_model=AnnouncementAdminOut)
@@ -288,9 +415,9 @@ def get_announcement_admin(
     row = _fetch_admin_announcement(db, announcement_id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, game_slug, game_name = row
+    item, creator_username, approver_username = row
     _ensure_announcement_scope(staff, item)
-    return _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.patch("/admin/news/{announcement_id}", response_model=AnnouncementAdminOut)
@@ -303,7 +430,7 @@ def update_announcement_admin(
     row = _fetch_admin_announcement(db, announcement_id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    announcement, _creator_username, _approver_username, _game_slug, _game_name = row
+    announcement, _creator_username, _approver_username = row
 
     _ensure_announcement_scope(staff, announcement)
     _ensure_can_edit(staff, announcement)
@@ -324,6 +451,23 @@ def update_announcement_admin(
         announcement.body = clean_body
         has_update = True
 
+    if data.game_slugs is not None:
+        selected_games = _resolve_games_for_staff(db, staff, data.game_slugs)
+        announcement.games = selected_games
+        announcement.game_id = selected_games[0].id if selected_games else None
+        has_update = True
+
+    if data.is_general is not None:
+        _ensure_general_scope(staff, data.is_general)
+        announcement.is_general = data.is_general
+        has_update = True
+
+    if not announcement.is_general and not _announcement_game_ids(announcement):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one game must be selected when General is not enabled",
+        )
+
     if data.workflow_action is not None:
         action = _coerce_workflow_action(data.workflow_action, data.workflow_action)
         if staff.role == "captain" and action in {"publish", "reject"}:
@@ -340,8 +484,8 @@ def update_announcement_admin(
     updated = _fetch_admin_announcement(db, announcement_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, game_slug, game_name = updated
-    return _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
+    item, creator_username, approver_username = updated
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.post("/admin/news/{announcement_id}/submit", response_model=AnnouncementAdminOut)
@@ -353,7 +497,7 @@ def submit_announcement_for_approval(
     row = _fetch_admin_announcement(db, announcement_id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    announcement, _creator_username, _approver_username, _game_slug, _game_name = row
+    announcement, _creator_username, _approver_username = row
 
     _ensure_announcement_scope(staff, announcement)
     _ensure_can_edit(staff, announcement)
@@ -364,8 +508,8 @@ def submit_announcement_for_approval(
     updated = _fetch_admin_announcement(db, announcement_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, game_slug, game_name = updated
-    return _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
+    item, creator_username, approver_username = updated
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.post("/admin/news/{announcement_id}/publish", response_model=AnnouncementAdminOut)
@@ -377,7 +521,7 @@ def publish_announcement(
     row = _fetch_admin_announcement(db, announcement_id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    announcement, _creator_username, _approver_username, _game_slug, _game_name = row
+    announcement, _creator_username, _approver_username = row
 
     _ensure_announcement_scope(staff, announcement)
     _set_workflow_state(announcement, staff, "publish")
@@ -387,8 +531,8 @@ def publish_announcement(
     updated = _fetch_admin_announcement(db, announcement_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, game_slug, game_name = updated
-    return _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
+    item, creator_username, approver_username = updated
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.post("/admin/news/{announcement_id}/reject", response_model=AnnouncementAdminOut)
@@ -400,7 +544,7 @@ def reject_announcement(
     row = _fetch_admin_announcement(db, announcement_id)
     if not row:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    announcement, _creator_username, _approver_username, _game_slug, _game_name = row
+    announcement, _creator_username, _approver_username = row
 
     _ensure_announcement_scope(staff, announcement)
     _set_workflow_state(announcement, staff, "reject")
@@ -410,56 +554,78 @@ def reject_announcement(
     updated = _fetch_admin_announcement(db, announcement_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, creator_username, approver_username, game_slug, game_name = updated
-    return _serialize_admin(item, creator_username, approver_username, game_slug, game_name)
+    item, creator_username, approver_username = updated
+    return _serialize_admin(item, creator_username, approver_username)
 
 
 @router.get("/news/latest", response_model=AnnouncementPublicOut | None)
-def get_latest_announcement(db: Session = Depends(get_db)):
-    row = (
-        db.query(EsportsAnnouncement, Game.slug, Game.name)
-        .outerjoin(Game, Game.id == EsportsAnnouncement.game_id)
+def get_latest_announcement(
+    game_slug: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    game = _resolve_public_game_by_slug(db, game_slug) if game_slug else None
+
+    query = (
+        db.query(EsportsAnnouncement)
+        .options(selectinload(EsportsAnnouncement.games))
         .filter(EsportsAnnouncement.state == "published")
-        .order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
+    )
+    query = _apply_public_game_filter(query, game)
+
+    item = (
+        query.order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
         .first()
     )
-    if not row:
+    if not item:
         return None
-    item, game_slug, game_name = row
-    return _serialize_public(item, game_slug, game_name)
+    return _serialize_public(item)
 
 
 @router.get("/news/archive", response_model=list[AnnouncementPublicOut])
 def list_archive_announcements(
     limit: int = Query(default=25, ge=1, le=250),
+    game_slug: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(EsportsAnnouncement, Game.slug, Game.name)
-        .outerjoin(Game, Game.id == EsportsAnnouncement.game_id)
+    game = _resolve_public_game_by_slug(db, game_slug) if game_slug else None
+
+    query = (
+        db.query(EsportsAnnouncement)
+        .options(selectinload(EsportsAnnouncement.games))
         .filter(EsportsAnnouncement.state == "published")
-        .order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
+    )
+    query = _apply_public_game_filter(query, game)
+
+    rows = (
+        query.order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
         .offset(1)
         .limit(limit)
         .all()
     )
-    return [_serialize_public(item, game_slug, game_name) for item, game_slug, game_name in rows]
+    return [_serialize_public(item) for item in rows]
 
 
 @router.get("/news", response_model=list[AnnouncementPublicOut])
 def list_public_announcements(
     limit: int = Query(default=25, ge=1, le=250),
+    game_slug: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    rows = (
-        db.query(EsportsAnnouncement, Game.slug, Game.name)
-        .outerjoin(Game, Game.id == EsportsAnnouncement.game_id)
+    game = _resolve_public_game_by_slug(db, game_slug) if game_slug else None
+
+    query = (
+        db.query(EsportsAnnouncement)
+        .options(selectinload(EsportsAnnouncement.games))
         .filter(EsportsAnnouncement.state == "published")
-        .order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
+    )
+    query = _apply_public_game_filter(query, game)
+
+    rows = (
+        query.order_by(EsportsAnnouncement.created_at.desc(), EsportsAnnouncement.id.desc())
         .limit(limit)
         .all()
     )
-    return [_serialize_public(item, game_slug, game_name) for item, game_slug, game_name in rows]
+    return [_serialize_public(item) for item in rows]
 
 
 @router.get("/news/{announcement_id}", response_model=AnnouncementPublicOut)
@@ -467,19 +633,18 @@ def get_announcement_public(
     announcement_id: int,
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(EsportsAnnouncement, Game.slug, Game.name)
-        .outerjoin(Game, Game.id == EsportsAnnouncement.game_id)
+    item = (
+        db.query(EsportsAnnouncement)
+        .options(selectinload(EsportsAnnouncement.games))
         .filter(
             EsportsAnnouncement.id == announcement_id,
             EsportsAnnouncement.state == "published",
         )
         .first()
     )
-    if not row:
+    if not item:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    item, game_slug, game_name = row
-    return _serialize_public(item, game_slug, game_name)
+    return _serialize_public(item)
 
 
 @router.delete("/admin/news/{announcement_id}")
@@ -490,6 +655,7 @@ def delete_announcement_admin(
 ):
     item = (
         db.query(EsportsAnnouncement)
+        .options(selectinload(EsportsAnnouncement.games))
         .filter(EsportsAnnouncement.id == announcement_id)
         .first()
     )
