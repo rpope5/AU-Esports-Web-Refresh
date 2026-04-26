@@ -6,6 +6,13 @@ const siteUrl = "https://goashlandesports.com";
 const siteTitle = "Ashland University Esports";
 const siteDescription =
   "The official home of Ashland University Esports, featuring team rosters, schedules, news, recruiting information, and player highlights.";
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: siteTitle,
+  alternateName: "AU Esports",
+  url: "https://goashlandesports.com/",
+};
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,6 +62,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         {children}
       </body>
     </html>
