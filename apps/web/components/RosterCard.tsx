@@ -1,5 +1,6 @@
 import { Player } from "@/types/Player";
 import { resolveContentImageUrl } from "@/lib/contentImages";
+import { formatRosterGameDetails, normalizeRosterRank, normalizeRosterRole } from "@/lib/rosterDisplay";
 
 interface RosterCardProps {
   player: Player;
@@ -16,6 +17,8 @@ export default function RosterCard({ player }: RosterCardProps) {
   const primaryGameName = player.primary_game_name || player.game;
   const secondaryGameNames = Array.isArray(player.secondary_game_names) ? player.secondary_game_names : [];
   const gameProfiles = Array.isArray(player.game_profiles) ? player.game_profiles : [];
+  const legacyRole = normalizeRosterRole(player.role);
+  const legacyRank = normalizeRosterRank(player.rank);
   const orderedProfiles = [...gameProfiles].sort((a, b) => {
     if (a.is_primary === b.is_primary) return 0;
     return a.is_primary ? -1 : 1;
@@ -36,12 +39,16 @@ export default function RosterCard({ player }: RosterCardProps) {
       <div className="mt-3 text-sm text-gray-300 space-y-1">
         {orderedProfiles.length > 0 ? (
           <>
-            {orderedProfiles.map((profile) => (
-              <p key={`${player.id}-${profile.game_slug}`}>
-                <strong>{profile.game_name || profile.game_slug}{profile.is_primary ? " (Primary)" : ""}:</strong>{" "}
-                {(profile.role || "N/A")} / {(profile.rank || "N/A")}
-              </p>
-            ))}
+            {orderedProfiles.map((profile) => {
+              const details = formatRosterGameDetails(profile.role, profile.rank);
+              const gameLabel = `${profile.game_name || profile.game_slug}${profile.is_primary ? " (Primary)" : ""}`;
+              return (
+                <p key={`${player.id}-${profile.game_slug}`}>
+                  <strong>{gameLabel}{details ? ":" : ""}</strong>
+                  {details ? ` ${details}` : ""}
+                </p>
+              );
+            })}
           </>
         ) : (
           <>
@@ -49,8 +56,8 @@ export default function RosterCard({ player }: RosterCardProps) {
             {secondaryGameNames.length > 0 && (
               <p><strong>Additional Games:</strong> {secondaryGameNames.join(", ")}</p>
             )}
-            <p><strong>Role:</strong> {player.role || "N/A"}</p>
-            <p><strong>Rank:</strong> {player.rank || "N/A"}</p>
+            {legacyRole && <p><strong>Role:</strong> {legacyRole}</p>}
+            {legacyRank && <p><strong>Rank:</strong> {legacyRank}</p>}
           </>
         )}
         <p><strong>Year:</strong> {player.year || "N/A"}</p>

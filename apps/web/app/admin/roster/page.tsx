@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import RosterCard from "@/components/RosterCard";
 import type { GameOption } from "@/types/GameOption";
 import type { Player } from "@/types/Player";
+import { normalizeRosterRank, rankInputValue } from "@/lib/rosterDisplay";
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
 
@@ -85,7 +86,7 @@ function prepareProfilesForSubmit(
   for (const row of rows) {
     const gameSlug = normalizeField(row.game_slug).toLowerCase();
     const role = normalizeField(row.role);
-    const rank = normalizeField(row.rank);
+    const rank = normalizeRosterRank(row.rank);
     const isBlank = !gameSlug && !role && !rank;
 
     if (isBlank) continue;
@@ -100,7 +101,7 @@ function prepareProfilesForSubmit(
     normalized.push({
       game_slug: gameSlug,
       role: role || null,
-      rank: rank || null,
+      rank,
       is_primary: Boolean(row.is_primary),
     });
   }
@@ -126,7 +127,7 @@ function buildProfilesFromPlayer(player: Player): GameProfileFormState[] {
       player.game_profiles.map((profile) => ({
         game_slug: profile.game_slug ?? "",
         role: profile.role ?? "",
-        rank: profile.rank ?? "",
+        rank: rankInputValue(profile.rank),
         is_primary: Boolean(profile.is_primary),
       })),
     );
@@ -138,7 +139,7 @@ function buildProfilesFromPlayer(player: Player): GameProfileFormState[] {
     fallbackProfiles.push({
       game_slug: primarySlug,
       role: player.role ?? "",
-      rank: player.rank ?? "",
+      rank: rankInputValue(player.rank),
       is_primary: true,
     });
   }
@@ -150,7 +151,7 @@ function buildProfilesFromPlayer(player: Player): GameProfileFormState[] {
     fallbackProfiles.push({
       game_slug: normalizedSlug,
       role: player.role ?? "",
-      rank: player.rank ?? "",
+      rank: rankInputValue(player.rank),
       is_primary: false,
     });
   }
@@ -216,10 +217,10 @@ function GameProfilesEditor({
       {profiles.map((profile, index) => {
         const displayGameName = gameNameBySlug.get(profile.game_slug) || profile.game_slug || "Select game";
         return (
-          <div key={`${index}-${profile.game_slug || "new"}`} className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
-            <div className="grid gap-2 md:grid-cols-12">
+          <div key={`${index}-${profile.game_slug || "new"}`} className="min-w-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+            <div className="grid min-w-0 gap-2 md:grid-cols-12">
               <select
-                className="rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-4"
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-5"
                 value={profile.game_slug}
                 disabled={disabled || games.length === 0}
                 onChange={(event) => updateProfileRow(index, { game_slug: event.target.value })}
@@ -238,20 +239,20 @@ function GameProfilesEditor({
                 )}
               </select>
               <input
-                className="rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-3"
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-4"
                 placeholder="Role"
                 value={profile.role}
                 disabled={disabled}
                 onChange={(event) => updateProfileRow(index, { role: event.target.value })}
               />
               <input
-                className="rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-3"
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-3"
                 placeholder="Rank"
                 value={profile.rank}
                 disabled={disabled}
                 onChange={(event) => updateProfileRow(index, { rank: event.target.value })}
               />
-              <div className="flex items-center justify-between gap-2 md:col-span-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 md:col-span-12">
                 <label className="flex items-center gap-2 text-xs text-neutral-300">
                   <input
                     type="radio"
@@ -263,7 +264,7 @@ function GameProfilesEditor({
                 </label>
                 <button
                   type="button"
-                  className="rounded border border-neutral-700 px-2 py-1 text-[11px] text-neutral-300 hover:border-neutral-500 disabled:opacity-50"
+                  className="shrink-0 rounded border border-neutral-700 px-2 py-1 text-[11px] text-neutral-300 hover:border-neutral-500 disabled:opacity-50"
                   disabled={disabled || profiles.length <= 1}
                   onClick={() => removeProfileRow(index)}
                 >
@@ -743,13 +744,13 @@ export default function AdminRosterPage() {
         ) : players.length === 0 ? (
           <p className="mt-4 text-sm text-neutral-400">No roster members yet.</p>
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {players.map((player) => {
               const isEditing = editingId === player.id;
               const isBusy = busyPlayerId === player.id || deletingPlayerId === player.id;
 
               return (
-                <article key={player.id} className="rounded-xl border border-neutral-800 bg-black/50 p-4">
+                <article key={player.id} className="min-w-0 overflow-hidden rounded-xl border border-neutral-800 bg-black/50 p-4">
                   <RosterCard player={player} />
 
                   <div className="mt-4 flex flex-wrap gap-2">
