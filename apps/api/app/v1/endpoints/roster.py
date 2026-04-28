@@ -39,6 +39,16 @@ def _normalize_optional(raw_value: str | None) -> str | None:
     return normalized if normalized else None
 
 
+NON_MEANINGFUL_RANK_VALUES = {"na", "n/a"}
+
+
+def _normalize_optional_rank(raw_value: str | None) -> str | None:
+    normalized = _normalize_optional(raw_value)
+    if normalized is None:
+        return None
+    return None if normalized.lower() in NON_MEANINGFUL_RANK_VALUES else normalized
+
+
 def _require_non_empty(raw_value: str, field_name: str) -> str:
     normalized = raw_value.strip()
     if not normalized:
@@ -221,7 +231,7 @@ def _parse_game_profiles(raw_profiles: str | None) -> list[dict[str, object]] | 
             {
                 "game_slug": raw_slug.strip().lower(),
                 "role": _normalize_optional(raw_role),
-                "rank": _normalize_optional(raw_rank),
+                "rank": _normalize_optional_rank(raw_rank),
                 "is_primary": raw_is_primary,
             }
         )
@@ -269,6 +279,7 @@ def _validate_game_profiles(
         return []
 
     seen: set[str] = set()
+    seen_game_ids: set[int] = set()
     normalized: list[ValidatedGameProfile] = []
     for item in parsed_profiles:
         slug = item["game_slug"]
@@ -280,8 +291,11 @@ def _validate_game_profiles(
         game = games_by_slug.get(slug)
         if not game:
             raise HTTPException(status_code=400, detail=f"Unknown game slug in game_profiles: {slug}")
+        if game.id in seen_game_ids:
+            raise HTTPException(status_code=400, detail="game_profiles cannot contain duplicate game entries")
 
         seen.add(slug)
+        seen_game_ids.add(game.id)
         normalized.append(
             ValidatedGameProfile(
                 game=game,
@@ -344,15 +358,37 @@ def _apply_game_profiles_to_player(player: Player, profiles: list[ValidatedGameP
     if len(profiles) == 0:
         raise HTTPException(status_code=400, detail="At least one game profile is required")
 
-    player.game_profiles = [
-        PlayerGameProfile(
-            game_id=profile.game.id,
-            role=profile.role,
-            rank=profile.rank,
-            is_primary=profile.is_primary,
+    existing_by_game_id = {profile.game_id: profile for profile in player.game_profiles}
+    reconciled_profiles: list[PlayerGameProfile] = []
+    incoming_game_ids: set[int] = set()
+
+    for incoming in profiles:
+        incoming_game_id = incoming.game.id
+        incoming_game_ids.add(incoming_game_id)
+
+        existing_profile = existing_by_game_id.get(incoming_game_id)
+        if existing_profile:
+            existing_profile.role = incoming.role
+            existing_profile.rank = incoming.rank
+            existing_profile.is_primary = incoming.is_primary
+            reconciled_profiles.append(existing_profile)
+            continue
+
+        reconciled_profiles.append(
+            PlayerGameProfile(
+                game_id=incoming_game_id,
+                role=incoming.role,
+                rank=incoming.rank,
+                is_primary=incoming.is_primary,
+            )
         )
-        for profile in profiles
-    ]
+
+    stale_profiles = [profile for profile in player.game_profiles if profile.game_id not in incoming_game_ids]
+    for stale in stale_profiles:
+        if stale in player.game_profiles:
+            player.game_profiles.remove(stale)
+
+    player.game_profiles = reconciled_profiles
 
     primary_profile = next((profile for profile in profiles if profile.is_primary), profiles[0])
     player.primary_game_id = primary_profile.game.id
@@ -437,7 +473,7 @@ def create_player_admin(
             primary_slug=resolved_primary_slug,
             secondary_slugs=parsed_secondary_slugs,
             shared_role=_normalize_optional(role),
-            shared_rank=_normalize_optional(rank),
+            shared_rank=_normalize_optional_rank(rank),
             games_by_slug=games_by_slug,
         )
 
@@ -531,7 +567,7 @@ def update_player_admin(
         player.role = _normalize_optional(role)
         has_update = True
     if parsed_game_profiles is None and rank is not None:
-        player.rank = _normalize_optional(rank)
+        player.rank = _normalize_optional_rank(rank)
         has_update = True
     if year is not None:
         player.year = _normalize_optional(year)
