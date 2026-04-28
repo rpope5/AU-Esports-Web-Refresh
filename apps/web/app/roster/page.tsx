@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Player } from "@/types/Player";
 import { GameOption } from "@/types/GameOption";
+import { LegacyRosterDetail, LegacyRosterListItem } from "@/types/LegacyRoster";
+import { ALL_GAMES_FILTER_VALUE, deriveGameOptions, filterPlayerByGame } from "@/lib/rosterFilters";
 import RosterGrid from "@/components/RosterGrid";
 import TopActivityFeedBar from "../components/TopActivityFeedBar";
 
@@ -25,60 +27,138 @@ export default function Home() {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<GameOption[]>([]);
-  const [selectedGameSlug, setSelectedGameSlug] = useState<string>("all");
+  const [selectedGameSlug, setSelectedGameSlug] = useState<string>(ALL_GAMES_FILTER_VALUE);
+  const [legacyRosters, setLegacyRosters] = useState<LegacyRosterListItem[]>([]);
+  const [legacyDetailsBySlug, setLegacyDetailsBySlug] = useState<Record<string, LegacyRosterDetail>>({});
+  const [selectedRoster, setSelectedRoster] = useState<string>("current");
+  const [loadingCurrentRoster, setLoadingCurrentRoster] = useState<boolean>(true);
+  const [loadingSelectedLegacy, setLoadingSelectedLegacy] = useState<boolean>(false);
+  const [currentRosterError, setCurrentRosterError] = useState<string | null>(null);
+  const [legacyRosterError, setLegacyRosterError] = useState<string | null>(null);
 
 useEffect(() => {
-  Promise.all([
-    fetch(`${apiUrl}/api/v1/roster`),
-    fetch(`${apiUrl}/api/v1/games`),
-  ])
-    .then(async ([rosterRes, gamesRes]) => {
-      if (!rosterRes.ok) throw new Error("Failed to load roster");
+  let cancelled = false;
+  setLoadingCurrentRoster(true);
+  setCurrentRosterError(null);
+
+  const load = async () => {
+    try {
+      const [rosterRes, gamesRes] = await Promise.all([
+        fetch(`${apiUrl}/api/v1/roster`),
+        fetch(`${apiUrl}/api/v1/games`),
+      ]);
+
+      if (!rosterRes.ok) throw new Error("Failed to load current roster.");
       const rosterData = await rosterRes.json();
-      setPlayers(Array.isArray(rosterData) ? rosterData : []);
+      if (!cancelled) {
+        setPlayers(Array.isArray(rosterData) ? rosterData : []);
+      }
 
       if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
-        setGames(Array.isArray(gamesData) ? gamesData : []);
-      } else {
+        if (!cancelled) {
+          setGames(Array.isArray(gamesData) ? gamesData : []);
+        }
+      } else if (!cancelled) {
         setGames([]);
       }
-    })
-    .catch(() => console.error("Failed to load roster data"));
+    } catch {
+      if (!cancelled) {
+        setCurrentRosterError("Failed to load current roster.");
+      }
+    } finally {
+      if (!cancelled) {
+        setLoadingCurrentRoster(false);
+      }
+    }
+  };
+
+  void load();
+  return () => {
+    cancelled = true;
+  };
 }, [apiUrl]);
 
-  const gameOptions = useMemo(() => {
-    if (games.length > 0) return games;
+  useEffect(() => {
+    let cancelled = false;
+    setLegacyRosterError(null);
 
-    const bySlug = new Map<string, GameOption>();
-    for (const player of players) {
-      const profiles = Array.isArray(player.game_profiles) ? player.game_profiles : [];
-      for (const profile of profiles) {
-        const slug = profile.game_slug;
-        const name = profile.game_name || profile.game_slug;
-        if (!slug || !name || bySlug.has(slug)) continue;
-        bySlug.set(slug, { id: -1, slug, name });
+    const loadLegacyRosters = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/legacy-rosters`);
+        if (!response.ok) {
+          throw new Error("Failed to load legacy rosters.");
+        }
+        const payload = await response.json();
+        if (!cancelled) {
+          setLegacyRosters(Array.isArray(payload) ? payload : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setLegacyRosters([]);
+          setLegacyRosterError("Legacy rosters are currently unavailable.");
+        }
       }
+    };
 
-      const slug = player.primary_game_slug;
-      const name = player.primary_game_name || player.game;
-      if (!slug || !name || bySlug.has(slug)) continue;
-      bySlug.set(slug, { id: -1, slug, name });
+    void loadLegacyRosters();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl]);
+
+  useEffect(() => {
+    if (selectedRoster === "current") {
+      setLegacyRosterError(null);
+      return;
     }
-    return Array.from(bySlug.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [games, players]);
+    if (legacyDetailsBySlug[selectedRoster]) return;
+
+    let cancelled = false;
+    setLoadingSelectedLegacy(true);
+    setLegacyRosterError(null);
+
+    const loadSelectedLegacyRoster = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/legacy-rosters/${selectedRoster}`);
+        if (!response.ok) {
+          throw new Error("Failed to load selected legacy roster.");
+        }
+        const payload = (await response.json()) as LegacyRosterDetail;
+        if (!cancelled) {
+          setLegacyDetailsBySlug((prev) => ({ ...prev, [selectedRoster]: payload }));
+        }
+      } catch {
+        if (!cancelled) {
+          setLegacyRosterError("Failed to load selected legacy roster.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSelectedLegacy(false);
+        }
+      }
+    };
+
+    void loadSelectedLegacyRoster();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, legacyDetailsBySlug, selectedRoster]);
+
+  const activePlayers = useMemo(() => {
+    if (selectedRoster === "current") return players;
+    const detail = legacyDetailsBySlug[selectedRoster];
+    if (!detail || !Array.isArray(detail.players)) return [];
+    return detail.players;
+  }, [legacyDetailsBySlug, players, selectedRoster]);
+
+  const gameOptions = useMemo(() => {
+    return deriveGameOptions(games, activePlayers);
+  }, [activePlayers, games]);
 
   const filteredPlayers = useMemo(() => {
-    if (selectedGameSlug === "all") return players;
-    return players.filter((player) => {
-      const profiles = Array.isArray(player.game_profiles) ? player.game_profiles : [];
-      if (profiles.some((profile) => profile.game_slug === selectedGameSlug)) {
-        return true;
-      }
-      if (player.primary_game_slug === selectedGameSlug) return true;
-      return Array.isArray(player.secondary_game_slugs) && player.secondary_game_slugs.includes(selectedGameSlug);
-    });
-  }, [players, selectedGameSlug]);
+    return activePlayers.filter((player) => filterPlayerByGame(player, selectedGameSlug));
+  }, [activePlayers, selectedGameSlug]);
 
   const [isLive, setIsLive] = useState(false);
 
@@ -150,7 +230,27 @@ useEffect(() => {
 
       <div className="text-4xl py-8 text-center font-Gotham-Bold">Team Roster</div>
 
-      <div className="mx-auto mb-6 w-full max-w-sm px-6">
+      <div className="mx-auto mb-6 grid w-full max-w-3xl gap-4 px-6 md:grid-cols-2">
+        <div>
+          <label htmlFor="roster-selector" className="mb-2 block text-sm font-medium text-gray-200">
+            Roster
+          </label>
+          <select
+            id="roster-selector"
+            className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-sm text-white"
+            value={selectedRoster}
+            onChange={(event) => setSelectedRoster(event.target.value)}
+          >
+            <option value="current">Current Roster</option>
+            {legacyRosters.map((roster) => (
+              <option key={roster.slug} value={roster.slug}>
+                {roster.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
         <label htmlFor="roster-game-filter" className="mb-2 block text-sm font-medium text-gray-200">
           Filter by game
         </label>
@@ -160,7 +260,7 @@ useEffect(() => {
           value={selectedGameSlug}
           onChange={(event) => setSelectedGameSlug(event.target.value)}
         >
-          <option value="all">All Games</option>
+          <option value={ALL_GAMES_FILTER_VALUE}>All Games</option>
           {gameOptions.map((game) => (
             <option key={game.slug} value={game.slug}>
               {game.name}
@@ -168,8 +268,24 @@ useEffect(() => {
           ))}
         </select>
       </div>
+      </div>
 
-      {filteredPlayers.length > 0 ? (
+      {currentRosterError && (
+        <div className="mx-6 mb-6 rounded-xl border border-red-700 bg-red-900/20 px-6 py-4 text-sm text-red-200">
+          {currentRosterError}
+        </div>
+      )}
+      {legacyRosterError && (
+        <div className="mx-6 mb-6 rounded-xl border border-amber-700 bg-amber-900/20 px-6 py-4 text-sm text-amber-200">
+          {legacyRosterError}
+        </div>
+      )}
+
+      {loadingCurrentRoster || loadingSelectedLegacy ? (
+        <div className="mx-6 mb-16 rounded-xl border border-gray-700 bg-gray-900/60 px-6 py-10 text-center text-sm text-gray-300">
+          Loading roster...
+        </div>
+      ) : filteredPlayers.length > 0 ? (
         <RosterGrid players={filteredPlayers} />
       ) : (
         <div className="mx-6 mb-16 rounded-xl border border-gray-700 bg-gray-900/60 px-6 py-10 text-center text-sm text-gray-300">
