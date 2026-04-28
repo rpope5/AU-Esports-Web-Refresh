@@ -1,37 +1,54 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import TopActivityFeedBar from "./components/TopActivityFeedBar";
 
+type TweetItem = {
+  title: string;
+  link: string;
+  pubDate?: string;
+};
+
+type TwitterFeedResponse = {
+  items?: TweetItem[];
+  hasMore?: boolean;
+};
+
 function TwitterFeed() {
-  const [tweets, setTweets] = useState<any[]>([]);
+  const [tweets, setTweets] = useState<TweetItem[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
 
-  const loadTweets = async (nextPage: number) => {
-    if (loading) return;
+  const loadTweets = useCallback(async (nextPage: number) => {
+    if (loadingRef.current) return;
 
+    loadingRef.current = true;
     setLoading(true);
 
     try {
       const res = await fetch(`/api/twitter?page=${nextPage}`);
-      const data = await res.json();
+      const data = (await res.json()) as TwitterFeedResponse;
 
       if (data.items) {
-        setTweets((prev) => [...prev, ...data.items]);
-        setHasMore(data.hasMore);
+        setTweets((prev) => [...prev, ...(data.items || [])]);
+        setHasMore(Boolean(data.hasMore));
       }
     } catch {}
 
+    loadingRef.current = false;
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    loadTweets(1);
-  }, []);
+    const timeoutId = window.setTimeout(() => {
+      void loadTweets(1);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadTweets]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -49,7 +66,7 @@ function TwitterFeed() {
     el?.addEventListener("scroll", handleScroll);
 
     return () => el?.removeEventListener("scroll", handleScroll);
-  }, [page, loading, hasMore]);
+  }, [page, loading, hasMore, loadTweets]);
 
   return (
     <div className="flex w-full flex-col">
@@ -259,14 +276,27 @@ export default function Home() {
                   href="https://critapparel.com/collections/ashland-university?_pos=1&_psq=Ashla&_ss=e&_v=1.0"
                   className="shop-btn"
                 >
-                  <img src="/crit.png" alt="Crit Apparel shop" className="w-40 max-w-full" />
+                  <Image
+                    src={"/crit.png"}
+                    alt={"Crit Apparel shop"}
+                    width={90}
+                    height={90}
+                    className="w-40 max-w-full"
+                  />
                 </a>
 
                 <a
                   href="https://theinfiniteinc.com/collections/e-sports/products/ashland-university-original-e-sports-jersey"
                   className="shop-btn-alt"
                 >
-                  <img src="/jersey.png" alt="Ashland jersey shop" className="w-40 max-w-full" />
+                  
+                  <Image
+                    src={"/jersey.png"}
+                    alt={"Ashland jersey shop"}
+                    width={90}
+                    height={90}
+                    className="w-40 max-w-full"
+                  />
                 </a>
               </div>
             </div>
