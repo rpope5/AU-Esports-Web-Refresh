@@ -52,6 +52,14 @@ useEffect(() => {
 
     const bySlug = new Map<string, GameOption>();
     for (const player of players) {
+      const profiles = Array.isArray(player.game_profiles) ? player.game_profiles : [];
+      for (const profile of profiles) {
+        const slug = profile.game_slug;
+        const name = profile.game_name || profile.game_slug;
+        if (!slug || !name || bySlug.has(slug)) continue;
+        bySlug.set(slug, { id: -1, slug, name });
+      }
+
       const slug = player.primary_game_slug;
       const name = player.primary_game_name || player.game;
       if (!slug || !name || bySlug.has(slug)) continue;
@@ -63,6 +71,10 @@ useEffect(() => {
   const filteredPlayers = useMemo(() => {
     if (selectedGameSlug === "all") return players;
     return players.filter((player) => {
+      const profiles = Array.isArray(player.game_profiles) ? player.game_profiles : [];
+      if (profiles.some((profile) => profile.game_slug === selectedGameSlug)) {
+        return true;
+      }
       if (player.primary_game_slug === selectedGameSlug) return true;
       return Array.isArray(player.secondary_game_slugs) && player.secondary_game_slugs.includes(selectedGameSlug);
     });

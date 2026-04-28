@@ -1,3 +1,11 @@
+export interface PlayerGameProfile {
+  game_slug: string;
+  game_name: string | null;
+  role: string | null;
+  rank: string | null;
+  is_primary: boolean;
+}
+
 export interface Player {
   id: number;
   name: string;
@@ -9,6 +17,7 @@ export interface Player {
   secondary_game_names: string[];
   role: string | null;
   rank: string | null;
+  game_profiles: PlayerGameProfile[];
   year: string | null;
   major: string | null;
   headshot: string | null;
