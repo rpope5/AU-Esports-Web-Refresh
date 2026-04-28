@@ -347,11 +347,6 @@ function DatePickerField({
   const [monthCursor, setMonthCursor] = useState(() => parseDateValue(value) || new Date());
   const containerRef = useDismissibleLayer(open, () => setOpen(false));
 
-  useEffect(() => {
-    if (!open) return;
-    setMonthCursor(parseDateValue(value) || new Date());
-  }, [open, value]);
-
   const selectedLabel = value ? formatSelectedDateLabel(value) : placeholder;
   const todayValue = toLocalDateValue(new Date());
   const cells = useMemo(() => buildCalendarCells(monthCursor), [monthCursor]);
@@ -361,7 +356,15 @@ function DatePickerField({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() =>
+          setOpen((prev) => {
+            const nextOpen = !prev;
+            if (nextOpen) {
+              setMonthCursor(parseDateValue(value) || new Date());
+            }
+            return nextOpen;
+          })
+        }
         className="flex w-full items-center justify-between rounded border border-neutral-700 bg-black px-3 py-2 text-left text-sm text-neutral-100 transition hover:border-neutral-500 disabled:opacity-60"
       >
         <span className={`inline-flex items-center gap-2 ${value ? "text-neutral-100" : "text-neutral-400"}`}>

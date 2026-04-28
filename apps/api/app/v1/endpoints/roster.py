@@ -1,6 +1,7 @@
 import os
 import json
 import re
+from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -15,7 +16,7 @@ from app.core.deps import (
 )
 from app.core.uploads import ImageUploadConfig, delete_uploaded_image, save_uploaded_image
 from app.models.game import Game
-from app.models.roster import Player
+from app.models.roster import Player, PlayerGameProfile
 from app.schemas.roster import GameOptionOut, PlayerOut
 
 router = APIRouter()
@@ -36,6 +37,16 @@ def _normalize_optional(raw_value: str | None) -> str | None:
         return None
     normalized = raw_value.strip()
     return normalized if normalized else None
+
+
+NON_MEANINGFUL_RANK_VALUES = {"na", "n/a"}
+
+
+def _normalize_optional_rank(raw_value: str | None) -> str | None:
+    normalized = _normalize_optional(raw_value)
+    if normalized is None:
+        return None
+    return None if normalized.lower() in NON_MEANINGFUL_RANK_VALUES else normalized
 
 
 def _require_non_empty(raw_value: str, field_name: str) -> str:
@@ -86,6 +97,14 @@ LEGACY_GAME_KEY_TO_SLUG: dict[str, str] = {
     "mario kart": "mario-kart",
     "mariokart": "mario-kart",
 }
+
+
+@dataclass
+class ValidatedGameProfile:
+    game: Game
+    role: str | None
+    rank: str | None
+    is_primary: bool
 
 
 def _list_games(db: Session) -> list[Game]:
@@ -171,6 +190,55 @@ def _parse_secondary_game_slugs(raw_secondary: str | None) -> list[str] | None:
     return cleaned
 
 
+def _parse_game_profiles(raw_profiles: str | None) -> list[dict[str, object]] | None:
+    if raw_profiles is None:
+        return None
+
+    text_value = raw_profiles.strip()
+    if not text_value:
+        return []
+
+    try:
+        parsed: object = json.loads(text_value)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="game_profiles must be a valid JSON array") from exc
+
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail="game_profiles must be a JSON array")
+
+    normalized_profiles: list[dict[str, object]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail="Each game profile must be an object")
+
+        raw_slug = item.get("game_slug")
+        if not isinstance(raw_slug, str) or not raw_slug.strip():
+            raise HTTPException(status_code=400, detail="Each game profile must include game_slug")
+
+        raw_role = item.get("role")
+        if raw_role is not None and not isinstance(raw_role, str):
+            raise HTTPException(status_code=400, detail="game profile role must be a string or null")
+
+        raw_rank = item.get("rank")
+        if raw_rank is not None and not isinstance(raw_rank, str):
+            raise HTTPException(status_code=400, detail="game profile rank must be a string or null")
+
+        raw_is_primary = item.get("is_primary", False)
+        if not isinstance(raw_is_primary, bool):
+            raise HTTPException(status_code=400, detail="game profile is_primary must be a boolean")
+
+        normalized_profiles.append(
+            {
+                "game_slug": raw_slug.strip().lower(),
+                "role": _normalize_optional(raw_role),
+                "rank": _normalize_optional_rank(raw_rank),
+                "is_primary": raw_is_primary,
+            }
+        )
+
+    return normalized_profiles
+
+
 def _validate_game_selection(
     *,
     primary_slug: str,
@@ -199,12 +267,144 @@ def _validate_game_selection(
     return primary_game, [games_by_slug[slug] for slug in ordered_secondary]
 
 
+def _validate_game_profiles(
+    *,
+    parsed_profiles: list[dict[str, object]],
+    games_by_slug: dict[str, Game],
+    required: bool,
+) -> list[ValidatedGameProfile]:
+    if len(parsed_profiles) == 0:
+        if required:
+            raise HTTPException(status_code=400, detail="At least one game profile is required")
+        return []
+
+    seen: set[str] = set()
+    seen_game_ids: set[int] = set()
+    normalized: list[ValidatedGameProfile] = []
+    for item in parsed_profiles:
+        slug = item["game_slug"]
+        if not isinstance(slug, str):
+            raise HTTPException(status_code=400, detail="Each game profile must include game_slug")
+        if slug in seen:
+            raise HTTPException(status_code=400, detail="game_profiles cannot contain duplicate game_slug values")
+
+        game = games_by_slug.get(slug)
+        if not game:
+            raise HTTPException(status_code=400, detail=f"Unknown game slug in game_profiles: {slug}")
+        if game.id in seen_game_ids:
+            raise HTTPException(status_code=400, detail="game_profiles cannot contain duplicate game entries")
+
+        seen.add(slug)
+        seen_game_ids.add(game.id)
+        normalized.append(
+            ValidatedGameProfile(
+                game=game,
+                role=item["role"] if isinstance(item["role"], str) or item["role"] is None else None,
+                rank=item["rank"] if isinstance(item["rank"], str) or item["rank"] is None else None,
+                is_primary=bool(item["is_primary"]),
+            )
+        )
+
+    primary_index = next((index for index, profile in enumerate(normalized) if profile.is_primary), 0)
+    finalized: list[ValidatedGameProfile] = []
+    for index, profile in enumerate(normalized):
+        finalized.append(
+            ValidatedGameProfile(
+                game=profile.game,
+                role=profile.role,
+                rank=profile.rank,
+                is_primary=index == primary_index,
+            )
+        )
+
+    return finalized
+
+
+def _build_game_profiles_from_legacy(
+    *,
+    primary_slug: str,
+    secondary_slugs: list[str],
+    shared_role: str | None,
+    shared_rank: str | None,
+    games_by_slug: dict[str, Game],
+) -> list[ValidatedGameProfile]:
+    primary_game, secondary_games = _validate_game_selection(
+        primary_slug=primary_slug,
+        secondary_slugs=secondary_slugs,
+        games_by_slug=games_by_slug,
+    )
+
+    profiles: list[ValidatedGameProfile] = [
+        ValidatedGameProfile(
+            game=primary_game,
+            role=shared_role,
+            rank=shared_rank,
+            is_primary=True,
+        )
+    ]
+    profiles.extend(
+        ValidatedGameProfile(
+            game=game,
+            role=shared_role,
+            rank=shared_rank,
+            is_primary=False,
+        )
+        for game in secondary_games
+    )
+    return profiles
+
+
+def _apply_game_profiles_to_player(player: Player, profiles: list[ValidatedGameProfile]) -> None:
+    if len(profiles) == 0:
+        raise HTTPException(status_code=400, detail="At least one game profile is required")
+
+    existing_by_game_id = {profile.game_id: profile for profile in player.game_profiles}
+    reconciled_profiles: list[PlayerGameProfile] = []
+    incoming_game_ids: set[int] = set()
+
+    for incoming in profiles:
+        incoming_game_id = incoming.game.id
+        incoming_game_ids.add(incoming_game_id)
+
+        existing_profile = existing_by_game_id.get(incoming_game_id)
+        if existing_profile:
+            existing_profile.role = incoming.role
+            existing_profile.rank = incoming.rank
+            existing_profile.is_primary = incoming.is_primary
+            reconciled_profiles.append(existing_profile)
+            continue
+
+        reconciled_profiles.append(
+            PlayerGameProfile(
+                game_id=incoming_game_id,
+                role=incoming.role,
+                rank=incoming.rank,
+                is_primary=incoming.is_primary,
+            )
+        )
+
+    stale_profiles = [profile for profile in player.game_profiles if profile.game_id not in incoming_game_ids]
+    for stale in stale_profiles:
+        if stale in player.game_profiles:
+            player.game_profiles.remove(stale)
+
+    player.game_profiles = reconciled_profiles
+
+    primary_profile = next((profile for profile in profiles if profile.is_primary), profiles[0])
+    player.primary_game_id = primary_profile.game.id
+    player.game = primary_profile.game.name
+    player.role = primary_profile.role
+    player.rank = primary_profile.rank
+    player.secondary_games = [profile.game for profile in profiles if not profile.is_primary]
+
+
 def _list_players(db: Session) -> list[Player]:
     players = (
         db.query(Player)
         .options(
             joinedload(Player.primary_game),
             selectinload(Player.secondary_games),
+            selectinload(Player.game_profiles).joinedload(PlayerGameProfile.game),
         )
         .all()
     )
@@ -240,6 +440,7 @@ def list_players_admin(
 def create_player_admin(
     name: str = Form(...),
     gamertag: str = Form(...),
+    game_profiles: str | None = Form(default=None),
     primary_game_slug: str | None = Form(default=None),
     game: str | None = Form(default=None),
     secondary_game_slugs: str | None = Form(default=None),
@@ -253,18 +454,28 @@ def create_player_admin(
     _staff: StaffPrincipal = Depends(require_roster_manager),
 ):
     games_by_slug = _games_by_slug(db)
-    resolved_primary_slug = _resolve_primary_slug(
-        primary_game_slug=primary_game_slug,
-        legacy_game=game,
-        games_by_slug=games_by_slug,
-        required=True,
-    )
-    parsed_secondary_slugs = _parse_secondary_game_slugs(secondary_game_slugs) or []
-    primary_game, secondary_games = _validate_game_selection(
-        primary_slug=resolved_primary_slug,
-        secondary_slugs=parsed_secondary_slugs,
-        games_by_slug=games_by_slug,
-    )
+    parsed_game_profiles = _parse_game_profiles(game_profiles)
+    if parsed_game_profiles is not None:
+        validated_profiles = _validate_game_profiles(
+            parsed_profiles=parsed_game_profiles,
+            games_by_slug=games_by_slug,
+            required=True,
+        )
+    else:
+        resolved_primary_slug = _resolve_primary_slug(
+            primary_game_slug=primary_game_slug,
+            legacy_game=game,
+            games_by_slug=games_by_slug,
+            required=True,
+        )
+        parsed_secondary_slugs = _parse_secondary_game_slugs(secondary_game_slugs) or []
+        validated_profiles = _build_game_profiles_from_legacy(
+            primary_slug=resolved_primary_slug,
+            secondary_slugs=parsed_secondary_slugs,
+            shared_role=_normalize_optional(role),
+            shared_rank=_normalize_optional_rank(rank),
+            games_by_slug=games_by_slug,
+        )
 
     image_path = _normalize_optional(headshot_url)
     if headshot and headshot.filename:
@@ -273,15 +484,15 @@ def create_player_admin(
     player = Player(
         name=_require_non_empty(name, "name"),
         gamertag=_require_non_empty(gamertag, "gamertag"),
-        game=primary_game.name,
-        primary_game_id=primary_game.id,
-        role=_normalize_optional(role),
-        rank=_normalize_optional(rank),
+        game=validated_profiles[0].game.name,
+        primary_game_id=validated_profiles[0].game.id,
+        role=validated_profiles[0].role,
+        rank=validated_profiles[0].rank,
         year=_normalize_optional(year),
         major=_normalize_optional(major),
         headshot=image_path,
     )
-    player.secondary_games = secondary_games
+    _apply_game_profiles_to_player(player, validated_profiles)
 
     db.add(player)
     db.commit()
@@ -295,6 +506,7 @@ def update_player_admin(
     player_id: int,
     name: str | None = Form(default=None),
     gamertag: str | None = Form(default=None),
+    game_profiles: str | None = Form(default=None),
     primary_game_slug: str | None = Form(default=None),
     game: str | None = Form(default=None),
     secondary_game_slugs: str | None = Form(default=None),
@@ -313,6 +525,7 @@ def update_player_admin(
         raise HTTPException(status_code=404, detail="Player not found")
 
     games_by_slug = _games_by_slug(db)
+    parsed_game_profiles = _parse_game_profiles(game_profiles)
     resolved_primary_slug = _resolve_primary_slug(
         primary_game_slug=primary_game_slug,
         legacy_game=game,
@@ -323,6 +536,7 @@ def update_player_admin(
 
     has_update = False
     primary_updated = False
+    game_profiles_updated = False
 
     if name is not None:
         player.name = _require_non_empty(name, "name")
@@ -330,7 +544,16 @@ def update_player_admin(
     if gamertag is not None:
         player.gamertag = _require_non_empty(gamertag, "gamertag")
         has_update = True
-    if resolved_primary_slug is not None:
+    if parsed_game_profiles is not None:
+        validated_profiles = _validate_game_profiles(
+            parsed_profiles=parsed_game_profiles,
+            games_by_slug=games_by_slug,
+            required=True,
+        )
+        _apply_game_profiles_to_player(player, validated_profiles)
+        game_profiles_updated = True
+        has_update = True
+    elif resolved_primary_slug is not None:
         primary_game, _secondary_games = _validate_game_selection(
             primary_slug=resolved_primary_slug,
             secondary_slugs=[],
@@ -340,11 +563,11 @@ def update_player_admin(
         player.game = primary_game.name
         primary_updated = True
         has_update = True
-    if role is not None:
+    if parsed_game_profiles is None and role is not None:
         player.role = _normalize_optional(role)
         has_update = True
-    if rank is not None:
-        player.rank = _normalize_optional(rank)
+    if parsed_game_profiles is None and rank is not None:
+        player.rank = _normalize_optional_rank(rank)
         has_update = True
     if year is not None:
         player.year = _normalize_optional(year)
@@ -374,7 +597,7 @@ def update_player_admin(
         player.headshot = uploaded_path
         has_update = True
 
-    if parsed_secondary_slugs is not None:
+    if parsed_game_profiles is None and parsed_secondary_slugs is not None:
         base_primary_slug = player.primary_game_slug
         if not base_primary_slug:
             raise HTTPException(status_code=400, detail="A primary game must be selected before secondary games")
@@ -386,7 +609,7 @@ def update_player_admin(
         )
         player.secondary_games = secondary_games
         has_update = True
-    elif primary_updated:
+    elif parsed_game_profiles is None and primary_updated:
         base_primary_slug = player.primary_game_slug
         if base_primary_slug:
             existing_secondary = [slug for slug in player.secondary_game_slugs if slug != base_primary_slug]
@@ -396,6 +619,35 @@ def update_player_admin(
                 games_by_slug=games_by_slug,
             )
             player.secondary_games = secondary_games
+
+    if parsed_game_profiles is None and (primary_updated or parsed_secondary_slugs is not None or role is not None or rank is not None):
+        base_primary_slug = player.primary_game_slug
+        if not base_primary_slug:
+            raise HTTPException(status_code=400, detail="A primary game must be selected before configuring game profiles")
+
+        secondary_slugs_for_profiles = player.secondary_game_slugs
+        legacy_profiles = _build_game_profiles_from_legacy(
+            primary_slug=base_primary_slug,
+            secondary_slugs=secondary_slugs_for_profiles,
+            shared_role=player.role,
+            shared_rank=player.rank,
+            games_by_slug=games_by_slug,
+        )
+        _apply_game_profiles_to_player(player, legacy_profiles)
+        game_profiles_updated = True
+        has_update = True
+
+    if parsed_game_profiles is None and not game_profiles_updated and len(player.game_profiles) == 0:
+        base_primary_slug = player.primary_game_slug
+        if base_primary_slug:
+            legacy_profiles = _build_game_profiles_from_legacy(
+                primary_slug=base_primary_slug,
+                secondary_slugs=player.secondary_game_slugs,
+                shared_role=player.role,
+                shared_rank=player.rank,
+                games_by_slug=games_by_slug,
+            )
+            _apply_game_profiles_to_player(player, legacy_profiles)
 
     if not has_update:
         raise HTTPException(status_code=400, detail="No fields provided for update")

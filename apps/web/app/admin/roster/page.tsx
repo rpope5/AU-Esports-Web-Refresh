@@ -1,22 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import RosterCard from "@/components/RosterCard";
 import type { GameOption } from "@/types/GameOption";
+import type { LegacyRosterListItem } from "@/types/LegacyRoster";
 import type { Player } from "@/types/Player";
+import { ALL_GAMES_FILTER_VALUE, deriveGameOptions, filterPlayerByGame } from "@/lib/rosterFilters";
+import { normalizeRosterRank, rankInputValue } from "@/lib/rosterDisplay";
 import InlineDestructiveConfirm from "../_components/InlineDestructiveConfirm";
 import { clearAdminStorage, formatRoleLabel, parseAdminSession, type AdminSession } from "../_lib/session";
+
+type GameProfileFormState = {
+  game_slug: string;
+  role: string;
+  rank: string;
+  is_primary: boolean;
+};
+
+type GameProfilePayload = {
+  game_slug: string;
+  role: string | null;
+  rank: string | null;
+  is_primary: boolean;
+};
 
 type RosterFormState = {
   name: string;
   gamertag: string;
-  primary_game_slug: string;
-  secondary_game_slugs: string[];
-  role: string;
-  rank: string;
+  game_profiles: GameProfileFormState[];
   year: string;
   major: string;
   headshot_url: string;
@@ -25,10 +39,7 @@ type RosterFormState = {
 const EMPTY_FORM: RosterFormState = {
   name: "",
   gamertag: "",
-  primary_game_slug: "",
-  secondary_game_slugs: [],
-  role: "",
-  rank: "",
+  game_profiles: [],
   year: "",
   major: "",
   headshot_url: "",
@@ -38,55 +49,246 @@ function normalizeField(value: string): string {
   return value.trim();
 }
 
-type OptionalTextField = "role" | "rank" | "year" | "major" | "headshot_url";
+type OptionalTextField = "year" | "major" | "headshot_url";
 
 function appendOptional(formData: FormData, key: OptionalTextField, value: string): void {
   formData.append(key, normalizeField(value));
 }
 
-type SecondaryGameSelectorProps = {
-  games: GameOption[];
-  primarySlug: string;
-  selectedSlugs: string[];
-  disabled?: boolean;
-  onToggle: (slug: string, checked: boolean) => void;
-};
+function createDefaultProfile(gameSlug: string): GameProfileFormState {
+  return {
+    game_slug: gameSlug,
+    role: "",
+    rank: "",
+    is_primary: true,
+  };
+}
 
-function SecondaryGameSelector({
-  games,
-  primarySlug,
-  selectedSlugs,
-  disabled = false,
-  onToggle,
-}: SecondaryGameSelectorProps) {
-  if (games.length === 0) {
-    return (
-      <p className="text-xs text-neutral-500">
-        No canonical games are currently available.
-      </p>
+function normalizeProfilesForDisplay(rows: GameProfileFormState[]): GameProfileFormState[] {
+  const normalized = rows.map((row) => ({
+    game_slug: normalizeField(row.game_slug).toLowerCase(),
+    role: row.role,
+    rank: row.rank,
+    is_primary: Boolean(row.is_primary),
+  }));
+
+  if (normalized.length === 0) return normalized;
+
+  let primaryIndex = normalized.findIndex((row) => row.is_primary);
+  if (primaryIndex < 0) primaryIndex = 0;
+  return normalized.map((row, index) => ({ ...row, is_primary: index === primaryIndex }));
+}
+
+function prepareProfilesForSubmit(
+  rows: GameProfileFormState[],
+): { payload: GameProfilePayload[]; error: string | null } {
+  const seen = new Set<string>();
+  const normalized: GameProfilePayload[] = [];
+
+  for (const row of rows) {
+    const gameSlug = normalizeField(row.game_slug).toLowerCase();
+    const role = normalizeField(row.role);
+    const rank = normalizeRosterRank(row.rank);
+    const isBlank = !gameSlug && !role && !rank;
+
+    if (isBlank) continue;
+    if (!gameSlug) {
+      return { payload: [], error: "Each game entry must select a game." };
+    }
+    if (seen.has(gameSlug)) {
+      return { payload: [], error: "Game entries cannot contain duplicate games." };
+    }
+
+    seen.add(gameSlug);
+    normalized.push({
+      game_slug: gameSlug,
+      role: role || null,
+      rank,
+      is_primary: Boolean(row.is_primary),
+    });
+  }
+
+  if (normalized.length === 0) {
+    return { payload: [], error: "At least one game entry is required." };
+  }
+
+  let primaryIndex = normalized.findIndex((profile) => profile.is_primary);
+  if (primaryIndex < 0) primaryIndex = 0;
+  return {
+    payload: normalized.map((profile, index) => ({
+      ...profile,
+      is_primary: index === primaryIndex,
+    })),
+    error: null,
+  };
+}
+
+function buildProfilesFromPlayer(player: Player): GameProfileFormState[] {
+  if (Array.isArray(player.game_profiles) && player.game_profiles.length > 0) {
+    return normalizeProfilesForDisplay(
+      player.game_profiles.map((profile) => ({
+        game_slug: profile.game_slug ?? "",
+        role: profile.role ?? "",
+        rank: rankInputValue(profile.rank),
+        is_primary: Boolean(profile.is_primary),
+      })),
     );
   }
 
+  const fallbackProfiles: GameProfileFormState[] = [];
+  const primarySlug = player.primary_game_slug ?? "";
+  if (primarySlug) {
+    fallbackProfiles.push({
+      game_slug: primarySlug,
+      role: player.role ?? "",
+      rank: rankInputValue(player.rank),
+      is_primary: true,
+    });
+  }
+
+  const secondarySlugs = Array.isArray(player.secondary_game_slugs) ? player.secondary_game_slugs : [];
+  for (const slug of secondarySlugs) {
+    const normalizedSlug = normalizeField(slug).toLowerCase();
+    if (!normalizedSlug || normalizedSlug === primarySlug) continue;
+    fallbackProfiles.push({
+      game_slug: normalizedSlug,
+      role: player.role ?? "",
+      rank: rankInputValue(player.rank),
+      is_primary: false,
+    });
+  }
+
+  return normalizeProfilesForDisplay(fallbackProfiles);
+}
+
+type GameProfilesEditorProps = {
+  games: GameOption[];
+  profiles: GameProfileFormState[];
+  disabled?: boolean;
+  onChange: (profiles: GameProfileFormState[]) => void;
+};
+
+function GameProfilesEditor({
+  games,
+  profiles,
+  disabled = false,
+  onChange,
+}: GameProfilesEditorProps) {
+  const gameNameBySlug = useMemo(
+    () => new Map(games.map((game) => [game.slug, game.name])),
+    [games],
+  );
+
+  function setProfiles(nextProfiles: GameProfileFormState[]): void {
+    onChange(normalizeProfilesForDisplay(nextProfiles));
+  }
+
+  function addProfileRow(): void {
+    const used = new Set(
+      profiles
+        .map((profile) => normalizeField(profile.game_slug).toLowerCase())
+        .filter((slug) => Boolean(slug)),
+    );
+    const nextGame = games.find((game) => !used.has(game.slug));
+    const fallbackSlug = nextGame?.slug || games[0]?.slug || "";
+    const next = [...profiles, { game_slug: fallbackSlug, role: "", rank: "", is_primary: profiles.length === 0 }];
+    setProfiles(next);
+  }
+
+  function removeProfileRow(index: number): void {
+    const next = profiles.filter((_, rowIndex) => rowIndex !== index);
+    setProfiles(next);
+  }
+
+  function updateProfileRow(index: number, patch: Partial<GameProfileFormState>): void {
+    const next = profiles.map((profile, rowIndex) => (rowIndex === index ? { ...profile, ...patch } : profile));
+    setProfiles(next);
+  }
+
+  function setPrimary(index: number): void {
+    const next = profiles.map((profile, rowIndex) => ({ ...profile, is_primary: rowIndex === index }));
+    setProfiles(next);
+  }
+
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {games.map((game) => {
-        const isPrimary = game.slug === primarySlug;
-        const isChecked = selectedSlugs.includes(game.slug);
+    <div className="space-y-3">
+      {profiles.length === 0 && (
+        <p className="text-xs text-neutral-500">No game entries yet. Add at least one game profile.</p>
+      )}
+
+      {profiles.map((profile, index) => {
+        const displayGameName = gameNameBySlug.get(profile.game_slug) || profile.game_slug || "Select game";
         return (
-          <label key={game.slug} className="flex items-center gap-2 rounded border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-300">
-            <input
-              type="checkbox"
-              checked={isChecked}
-              disabled={disabled || isPrimary}
-              onChange={(event) => onToggle(game.slug, event.target.checked)}
-            />
-            <span>
-              {game.name}
-              {isPrimary ? " (Primary)" : ""}
-            </span>
-          </label>
+          <div key={`${index}-${profile.game_slug || "new"}`} className="min-w-0 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+            <div className="grid min-w-0 gap-2 md:grid-cols-12">
+              <select
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-5"
+                value={profile.game_slug}
+                disabled={disabled || games.length === 0}
+                onChange={(event) => updateProfileRow(index, { game_slug: event.target.value })}
+              >
+                {games.length === 0 ? (
+                  <option value="">No canonical games available</option>
+                ) : (
+                  <>
+                    <option value="">Select game</option>
+                    {games.map((game) => (
+                      <option key={game.slug} value={game.slug}>
+                        {game.name}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+              <input
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-4"
+                placeholder="Role"
+                value={profile.role}
+                disabled={disabled}
+                onChange={(event) => updateProfileRow(index, { role: event.target.value })}
+              />
+              <input
+                className="w-full min-w-0 rounded border border-neutral-700 bg-neutral-950 p-2 text-xs md:col-span-3"
+                placeholder="Rank"
+                value={profile.rank}
+                disabled={disabled}
+                onChange={(event) => updateProfileRow(index, { rank: event.target.value })}
+              />
+              <div className="flex min-w-0 flex-wrap items-center gap-2 md:col-span-12">
+                <label className="flex items-center gap-2 text-xs text-neutral-300">
+                  <input
+                    type="radio"
+                    checked={profile.is_primary}
+                    disabled={disabled}
+                    onChange={() => setPrimary(index)}
+                  />
+                  Primary
+                </label>
+                <button
+                  type="button"
+                  className="shrink-0 rounded border border-neutral-700 px-2 py-1 text-[11px] text-neutral-300 hover:border-neutral-500 disabled:opacity-50"
+                  disabled={disabled || profiles.length <= 1}
+                  onClick={() => removeProfileRow(index)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-neutral-500">
+              {displayGameName}
+            </p>
+          </div>
         );
       })}
+
+      <button
+        type="button"
+        className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-200 hover:border-neutral-500 disabled:opacity-50"
+        disabled={disabled || games.length === 0}
+        onClick={addProfileRow}
+      >
+        Add Game Entry
+      </button>
     </div>
   );
 }
@@ -112,22 +314,40 @@ export default function AdminRosterPage() {
   const [removeEditHeadshot, setRemoveEditHeadshot] = useState(false);
   const [busyPlayerId, setBusyPlayerId] = useState<number | null>(null);
   const [deletingPlayerId, setDeletingPlayerId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedGameSlug, setSelectedGameSlug] = useState<string>(ALL_GAMES_FILTER_VALUE);
+
+  const [legacyRosters, setLegacyRosters] = useState<LegacyRosterListItem[]>([]);
+  const [showLegacyModal, setShowLegacyModal] = useState<boolean>(false);
+  const [legacyRosterName, setLegacyRosterName] = useState<string>("");
+  const [creatingLegacyRoster, setCreatingLegacyRoster] = useState<boolean>(false);
+  const [deletingLegacyRosterSlug, setDeletingLegacyRosterSlug] = useState<string | null>(null);
 
   const canViewRoster = Boolean(session?.permissions.can_view_roster);
   const canManageRoster = Boolean(session?.permissions.can_manage_roster);
   const canDeleteRoster = Boolean(session?.permissions.can_delete_roster);
+  const canDeleteLegacyRoster = session?.role === "admin";
+  const gameFilterOptions = useMemo(() => deriveGameOptions(games, players), [games, players]);
 
-  const normalizeSecondarySlugs = useCallback((slugs: string[], primarySlug: string): string[] => {
-    const deduped: string[] = [];
-    const seen = new Set<string>();
-    for (const rawSlug of slugs) {
-      const slug = rawSlug.trim().toLowerCase();
-      if (!slug || slug === primarySlug || seen.has(slug)) continue;
-      seen.add(slug);
-      deduped.push(slug);
-    }
-    return deduped;
-  }, []);
+  const filteredPlayers = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    return players.filter((player) => {
+      const matchesGame = filterPlayerByGame(player, selectedGameSlug);
+      if (!matchesGame) return false;
+      if (!normalizedSearch) return true;
+      const name = (player.name || "").toLowerCase();
+      const gamertag = (player.gamertag || "").toLowerCase();
+      return name.includes(normalizedSearch) || gamertag.includes(normalizedSearch);
+    });
+  }, [players, searchQuery, selectedGameSlug]);
+
+  const visiblePlayers = useMemo(() => {
+    if (editingId === null) return filteredPlayers;
+    if (filteredPlayers.some((player) => player.id === editingId)) return filteredPlayers;
+    const editingPlayer = players.find((player) => player.id === editingId);
+    if (!editingPlayer) return filteredPlayers;
+    return [editingPlayer, ...filteredPlayers];
+  }, [editingId, filteredPlayers, players]);
 
   function updateCreateField<K extends keyof RosterFormState>(field: K, value: RosterFormState[K]): void {
     setCreateForm((prev) => ({ ...prev, [field]: value }));
@@ -182,29 +402,16 @@ export default function AdminRosterPage() {
     }
   }, [apiUrl]);
 
-  function toggleCreateSecondaryGame(slug: string, checked: boolean): void {
-    setCreateForm((prev) => {
-      const next = checked
-        ? [...prev.secondary_game_slugs, slug]
-        : prev.secondary_game_slugs.filter((item) => item !== slug);
-      return {
-        ...prev,
-        secondary_game_slugs: normalizeSecondarySlugs(next, prev.primary_game_slug),
-      };
-    });
-  }
-
-  function toggleEditSecondaryGame(slug: string, checked: boolean): void {
-    setEditForm((prev) => {
-      const next = checked
-        ? [...prev.secondary_game_slugs, slug]
-        : prev.secondary_game_slugs.filter((item) => item !== slug);
-      return {
-        ...prev,
-        secondary_game_slugs: normalizeSecondarySlugs(next, prev.primary_game_slug),
-      };
-    });
-  }
+  const loadLegacyRosters = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/legacy-rosters`);
+      if (!res.ok) throw new Error("Failed to load legacy rosters");
+      const data = (await res.json()) as LegacyRosterListItem[];
+      setLegacyRosters(Array.isArray(data) ? data : []);
+    } catch {
+      setLegacyRosters([]);
+    }
+  }, [apiUrl]);
 
   useEffect(() => {
     const token = localStorage.getItem("au_admin_token");
@@ -238,7 +445,7 @@ export default function AdminRosterPage() {
           return;
         }
 
-        await Promise.all([loadRoster(token), loadGames()]);
+        await Promise.all([loadRoster(token), loadGames(), loadLegacyRosters()]);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to initialize roster editor");
         setLoading(false);
@@ -246,31 +453,28 @@ export default function AdminRosterPage() {
     };
 
     void init();
-  }, [apiUrl, loadGames, loadRoster, router]);
+  }, [apiUrl, loadGames, loadLegacyRosters, loadRoster, router]);
 
   useEffect(() => {
     if (games.length === 0) return;
     setCreateForm((prev) => {
-      if (prev.primary_game_slug) return prev;
-      return { ...prev, primary_game_slug: games[0].slug };
+      if (prev.game_profiles.length > 0) return prev;
+      return {
+        ...prev,
+        game_profiles: [createDefaultProfile(games[0].slug)],
+      };
     });
   }, [games]);
 
   function beginEdit(player: Player): void {
-    const primarySlug = player.primary_game_slug ?? "";
-    const secondarySlugs = normalizeSecondarySlugs(
-      Array.isArray(player.secondary_game_slugs) ? player.secondary_game_slugs : [],
-      primarySlug,
-    );
+    const profiles = buildProfilesFromPlayer(player);
+    const defaultProfiles = profiles.length > 0 ? profiles : (games[0] ? [createDefaultProfile(games[0].slug)] : []);
 
     setEditingId(player.id);
     setEditForm({
       name: player.name ?? "",
       gamertag: player.gamertag ?? "",
-      primary_game_slug: primarySlug,
-      secondary_game_slugs: secondarySlugs,
-      role: player.role ?? "",
-      rank: player.rank ?? "",
+      game_profiles: defaultProfiles,
       year: player.year ?? "",
       major: player.major ?? "",
       headshot_url: player.headshot ?? "",
@@ -299,10 +503,13 @@ export default function AdminRosterPage() {
 
     const name = normalizeField(createForm.name);
     const gamertag = normalizeField(createForm.gamertag);
-    const primaryGameSlug = normalizeField(createForm.primary_game_slug).toLowerCase();
-    const secondaryGameSlugs = normalizeSecondarySlugs(createForm.secondary_game_slugs, primaryGameSlug);
-    if (!name || !gamertag || !primaryGameSlug) {
-      setError("Name, gamertag, and primary game are required.");
+    const preparedProfiles = prepareProfilesForSubmit(createForm.game_profiles);
+    if (!name || !gamertag) {
+      setError("Name and gamertag are required.");
+      return;
+    }
+    if (preparedProfiles.error) {
+      setError(preparedProfiles.error);
       return;
     }
 
@@ -313,10 +520,7 @@ export default function AdminRosterPage() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("gamertag", gamertag);
-      formData.append("primary_game_slug", primaryGameSlug);
-      formData.append("secondary_game_slugs", JSON.stringify(secondaryGameSlugs));
-      appendOptional(formData, "role", createForm.role);
-      appendOptional(formData, "rank", createForm.rank);
+      formData.append("game_profiles", JSON.stringify(preparedProfiles.payload));
       appendOptional(formData, "year", createForm.year);
       appendOptional(formData, "major", createForm.major);
       appendOptional(formData, "headshot_url", createForm.headshot_url);
@@ -342,10 +546,10 @@ export default function AdminRosterPage() {
         throw new Error(responseText || "Failed to create roster member");
       }
 
-      setCreateForm((prev) => ({
+      setCreateForm({
         ...EMPTY_FORM,
-        primary_game_slug: prev.primary_game_slug,
-      }));
+        game_profiles: games[0] ? [createDefaultProfile(games[0].slug)] : [],
+      });
       setCreateHeadshot(null);
       setSuccess("Roster member created.");
       await loadRoster(token);
@@ -369,10 +573,13 @@ export default function AdminRosterPage() {
 
     const name = normalizeField(editForm.name);
     const gamertag = normalizeField(editForm.gamertag);
-    const primaryGameSlug = normalizeField(editForm.primary_game_slug).toLowerCase();
-    const secondaryGameSlugs = normalizeSecondarySlugs(editForm.secondary_game_slugs, primaryGameSlug);
-    if (!name || !gamertag || !primaryGameSlug) {
-      setError("Name, gamertag, and primary game are required.");
+    const preparedProfiles = prepareProfilesForSubmit(editForm.game_profiles);
+    if (!name || !gamertag) {
+      setError("Name and gamertag are required.");
+      return;
+    }
+    if (preparedProfiles.error) {
+      setError(preparedProfiles.error);
       return;
     }
 
@@ -383,10 +590,7 @@ export default function AdminRosterPage() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("gamertag", gamertag);
-      formData.append("primary_game_slug", primaryGameSlug);
-      formData.append("secondary_game_slugs", JSON.stringify(secondaryGameSlugs));
-      appendOptional(formData, "role", editForm.role);
-      appendOptional(formData, "rank", editForm.rank);
+      formData.append("game_profiles", JSON.stringify(preparedProfiles.payload));
       appendOptional(formData, "year", editForm.year);
       appendOptional(formData, "major", editForm.major);
       appendOptional(formData, "headshot_url", editForm.headshot_url);
@@ -471,6 +675,127 @@ export default function AdminRosterPage() {
     }
   }
 
+  async function createLegacyRosterSnapshot(): Promise<void> {
+    const token = localStorage.getItem("au_admin_token");
+    if (!token) {
+      router.push("/admin/login");
+      return;
+    }
+    if (!canManageRoster) {
+      setError("You do not have permission to create legacy rosters.");
+      return;
+    }
+
+    const normalizedName = normalizeField(legacyRosterName);
+    if (!normalizedName) {
+      setError("Legacy roster name is required.");
+      return;
+    }
+
+    setCreatingLegacyRoster(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/admin/legacy-rosters`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: normalizedName }),
+      });
+
+      if (res.status === 401) {
+        clearAdminStorage();
+        router.push("/admin/login");
+        return;
+      }
+      if (res.status === 403) {
+        setError("You do not have permission to create legacy rosters.");
+        return;
+      }
+
+      if (!res.ok) {
+        let detail = "Failed to create legacy roster.";
+        try {
+          const payload = await res.json() as { detail?: unknown };
+          if (typeof payload.detail === "string" && payload.detail.trim()) {
+            detail = payload.detail;
+          }
+        } catch {
+          const fallbackText = await res.text();
+          if (fallbackText.trim()) detail = fallbackText;
+        }
+        throw new Error(detail);
+      }
+
+      const payload = await res.json() as { name?: string };
+      const createdName = typeof payload.name === "string" ? payload.name : normalizedName;
+      setSuccess(`Legacy roster "${createdName}" created.`);
+      setLegacyRosterName("");
+      setShowLegacyModal(false);
+      await loadLegacyRosters();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create legacy roster.");
+    } finally {
+      setCreatingLegacyRoster(false);
+    }
+  }
+
+  async function deleteLegacyRosterSnapshot(legacyRoster: LegacyRosterListItem): Promise<void> {
+    const token = localStorage.getItem("au_admin_token");
+    if (!token) {
+      router.push("/admin/login");
+      throw new Error("Session expired");
+    }
+    if (!canDeleteLegacyRoster) {
+      throw new Error("Only admin users can delete legacy rosters.");
+    }
+
+    setDeletingLegacyRosterSlug(legacyRoster.slug);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/admin/legacy-rosters/${legacyRoster.slug}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        clearAdminStorage();
+        router.push("/admin/login");
+        throw new Error("Unauthorized");
+      }
+      if (res.status === 403) {
+        throw new Error("Only admin users can delete legacy rosters.");
+      }
+      if (res.status === 404) {
+        setLegacyRosters((prev) => prev.filter((roster) => roster.slug !== legacyRoster.slug));
+        if (normalizeField(legacyRosterName).toLowerCase() === legacyRoster.name.trim().toLowerCase()) {
+          setLegacyRosterName("");
+        }
+        setSuccess(`Legacy roster "${legacyRoster.name}" was already deleted.`);
+        return;
+      }
+      if (res.status !== 204) {
+        const responseText = await res.text();
+        throw new Error(responseText || "Failed to delete legacy roster.");
+      }
+
+      setLegacyRosters((prev) => prev.filter((roster) => roster.slug !== legacyRoster.slug));
+      if (normalizeField(legacyRosterName).toLowerCase() === legacyRoster.name.trim().toLowerCase()) {
+        setLegacyRosterName("");
+      }
+      setSuccess(`Legacy roster "${legacyRoster.name}" deleted.`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete legacy roster.";
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setDeletingLegacyRosterSlug(null);
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between gap-4">
@@ -480,12 +805,26 @@ export default function AdminRosterPage() {
             {session ? `Signed in as ${session.username} - ${formatRoleLabel(session.role)}` : "Loading session..."}
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm hover:border-neutral-700"
-        >
-          Back to Admin
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {canManageRoster && (
+            <button
+              type="button"
+              onClick={() => {
+                setLegacyRosterName("");
+                setShowLegacyModal(true);
+              }}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-neutral-100 hover:border-neutral-500"
+            >
+              Create Legacy Roster
+            </button>
+          )}
+          <Link
+            href="/admin"
+            className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm hover:border-neutral-700"
+          >
+            Back to Admin
+          </Link>
+        </div>
       </div>
 
       {canViewRoster && canManageRoster ? (
@@ -504,44 +843,6 @@ export default function AdminRosterPage() {
               value={createForm.gamertag}
               onChange={(event) => updateCreateField("gamertag", event.target.value)}
             />
-            <select
-              className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-              value={createForm.primary_game_slug}
-              onChange={(event) => {
-                const nextPrimarySlug = event.target.value;
-                updateCreateField("primary_game_slug", nextPrimarySlug);
-                updateCreateField(
-                  "secondary_game_slugs",
-                  normalizeSecondarySlugs(createForm.secondary_game_slugs, nextPrimarySlug),
-                );
-              }}
-              disabled={games.length === 0}
-            >
-              {games.length === 0 ? (
-                <option value="">No canonical games available</option>
-              ) : (
-                <>
-                  <option value="">Select primary game</option>
-                  {games.map((game) => (
-                    <option key={game.slug} value={game.slug}>
-                      {game.name}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-            <input
-              className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-              placeholder="Role"
-              value={createForm.role}
-              onChange={(event) => updateCreateField("role", event.target.value)}
-            />
-            <input
-              className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
-              placeholder="Rank"
-              value={createForm.rank}
-              onChange={(event) => updateCreateField("rank", event.target.value)}
-            />
             <input
               className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
               placeholder="Year"
@@ -555,21 +856,20 @@ export default function AdminRosterPage() {
               onChange={(event) => updateCreateField("major", event.target.value)}
             />
             <input
-              className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
+              className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm md:col-span-2"
               placeholder="Headshot URL (optional)"
               value={createForm.headshot_url}
               onChange={(event) => updateCreateField("headshot_url", event.target.value)}
             />
           </div>
 
-          <div className="mt-3">
-            <label className="mb-2 block text-sm text-neutral-300">Secondary / Additional Games (Optional)</label>
-            <SecondaryGameSelector
+          <div className="mt-4">
+            <label className="mb-2 block text-sm text-neutral-300">Game Entries (Game, Role, Rank)</label>
+            <GameProfilesEditor
               games={games}
-              primarySlug={createForm.primary_game_slug}
-              selectedSlugs={createForm.secondary_game_slugs}
-              disabled={creating || games.length === 0}
-              onToggle={toggleCreateSecondaryGame}
+              profiles={createForm.game_profiles}
+              disabled={creating}
+              onChange={(profiles) => updateCreateField("game_profiles", profiles)}
             />
           </div>
 
@@ -609,26 +909,94 @@ export default function AdminRosterPage() {
       {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
       {success && <p className="mt-4 text-sm text-emerald-400">{success}</p>}
 
+      {legacyRosters.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+          <h2 className="text-xl font-medium">Legacy Rosters</h2>
+          <p className="mt-1 text-sm text-neutral-400">Saved frozen snapshots of past teams.</p>
+          <ul className="mt-4 grid gap-2 md:grid-cols-2">
+            {legacyRosters.map((roster) => (
+              <li key={roster.slug} className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-neutral-100">{roster.name}</div>
+                    <div className="text-xs text-neutral-400">{roster.player_count} players</div>
+                  </div>
+                  {canDeleteLegacyRoster && (
+                    <InlineDestructiveConfirm
+                      triggerLabel="Delete"
+                      confirmMessage={`Delete legacy roster "${roster.name}"? This will remove the saved snapshot, but it will not affect the current active roster.`}
+                      confirmLabel="Delete Legacy Roster"
+                      pendingLabel="Deleting..."
+                      busy={deletingLegacyRosterSlug === roster.slug}
+                      onConfirm={() => deleteLegacyRosterSnapshot(roster)}
+                    />
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-xl font-medium">Roster Members</h2>
-          <span className="text-sm text-neutral-400">{players.length} total</span>
+          <span className="text-sm text-neutral-400">{filteredPlayers.length} shown / {players.length} total</span>
         </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <input
+            className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
+            placeholder="Search name or gamertag"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <select
+            className="rounded-lg border border-neutral-800 bg-neutral-900 p-2 text-sm"
+            value={selectedGameSlug}
+            onChange={(event) => setSelectedGameSlug(event.target.value)}
+          >
+            <option value={ALL_GAMES_FILTER_VALUE}>All Games</option>
+            {gameFilterOptions.map((game) => (
+              <option key={game.slug} value={game.slug}>
+                {game.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-neutral-500"
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedGameSlug(ALL_GAMES_FILTER_VALUE);
+            }}
+          >
+            Clear Filters
+          </button>
+        </div>
+
+        {editingId !== null && !filteredPlayers.some((player) => player.id === editingId) && (
+          <p className="mt-3 text-xs text-amber-300">
+            The active edit card stays visible even when current filters do not match.
+          </p>
+        )}
 
         {loading ? (
           <p className="mt-4 text-sm text-neutral-400">Loading roster...</p>
         ) : !canViewRoster ? (
           <p className="mt-4 text-sm text-red-400">You do not have permission to view roster members.</p>
-        ) : players.length === 0 ? (
-          <p className="mt-4 text-sm text-neutral-400">No roster members yet.</p>
+        ) : visiblePlayers.length === 0 ? (
+          <p className="mt-4 text-sm text-neutral-400">
+            {players.length === 0 ? "No roster members yet." : "No roster members match the current filters."}
+          </p>
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {players.map((player) => {
+          <div className="mt-6 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {visiblePlayers.map((player) => {
               const isEditing = editingId === player.id;
               const isBusy = busyPlayerId === player.id || deletingPlayerId === player.id;
 
               return (
-                <article key={player.id} className="rounded-xl border border-neutral-800 bg-black/50 p-4">
+                <article key={player.id} className="min-w-0 overflow-hidden rounded-xl border border-neutral-800 bg-black/50 p-4">
                   <RosterCard player={player} />
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -668,54 +1036,15 @@ export default function AdminRosterPage() {
                         onChange={(event) => updateEditField("gamertag", event.target.value)}
                         placeholder="Gamertag"
                       />
-                      <select
-                        className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
-                        value={editForm.primary_game_slug}
-                        onChange={(event) => {
-                          const nextPrimarySlug = event.target.value;
-                          updateEditField("primary_game_slug", nextPrimarySlug);
-                          updateEditField(
-                            "secondary_game_slugs",
-                            normalizeSecondarySlugs(editForm.secondary_game_slugs, nextPrimarySlug),
-                          );
-                        }}
-                        disabled={games.length === 0}
-                      >
-                        {games.length === 0 ? (
-                          <option value="">No canonical games available</option>
-                        ) : (
-                          <>
-                            <option value="">Select primary game</option>
-                            {games.map((game) => (
-                              <option key={game.slug} value={game.slug}>
-                                {game.name}
-                              </option>
-                            ))}
-                          </>
-                        )}
-                      </select>
                       <div>
-                        <label className="mb-1 block text-xs text-neutral-300">Secondary / Additional Games</label>
-                        <SecondaryGameSelector
+                        <label className="mb-1 block text-xs text-neutral-300">Game Entries (Game, Role, Rank)</label>
+                        <GameProfilesEditor
                           games={games}
-                          primarySlug={editForm.primary_game_slug}
-                          selectedSlugs={editForm.secondary_game_slugs}
-                          disabled={isBusy || games.length === 0}
-                          onToggle={toggleEditSecondaryGame}
+                          profiles={editForm.game_profiles}
+                          disabled={isBusy}
+                          onChange={(profiles) => updateEditField("game_profiles", profiles)}
                         />
                       </div>
-                      <input
-                        className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
-                        value={editForm.role}
-                        onChange={(event) => updateEditField("role", event.target.value)}
-                        placeholder="Role"
-                      />
-                      <input
-                        className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
-                        value={editForm.rank}
-                        onChange={(event) => updateEditField("rank", event.target.value)}
-                        placeholder="Rank"
-                      />
                       <input
                         className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"
                         value={editForm.year}
@@ -764,6 +1093,46 @@ export default function AdminRosterPage() {
           </div>
         )}
       </section>
+
+      {showLegacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-neutral-700 bg-neutral-950 p-5">
+            <h3 className="text-lg font-semibold text-white">Create Legacy Roster</h3>
+            <p className="mt-2 text-sm text-neutral-300">
+              This will save the current roster as a frozen snapshot. Future edits to the current roster will not
+              change this legacy roster.
+            </p>
+            <input
+              className="mt-4 w-full rounded-lg border border-neutral-700 bg-neutral-900 p-2 text-sm"
+              placeholder="Spring 2026"
+              value={legacyRosterName}
+              onChange={(event) => setLegacyRosterName(event.target.value)}
+              disabled={creatingLegacyRoster}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-neutral-500"
+                onClick={() => {
+                  if (creatingLegacyRoster) return;
+                  setShowLegacyModal(false);
+                }}
+                disabled={creatingLegacyRoster}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
+                onClick={() => void createLegacyRosterSnapshot()}
+                disabled={creatingLegacyRoster}
+              >
+                {creatingLegacyRoster ? "Saving Snapshot..." : "Create Legacy Roster"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
