@@ -263,7 +263,14 @@ export default function Home() {
                 autoPlay
                 loop
                 muted
-                className="h-full w-full rounded-lg object-cover"
+                playsInline
+                controls={false}
+                disablePictureInPicture
+                controlsList="nodownload noplaybackrate noremoteplayback"
+                preload="metadata"
+                aria-hidden="true"
+                tabIndex={-1}
+                className="home-hype-video h-full w-full rounded-lg object-cover"
               />
             </div>
 

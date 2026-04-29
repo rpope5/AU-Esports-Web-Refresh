@@ -206,6 +206,13 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0.5rem;
 }
 
+@media (max-width: 639px) {
+  .home-hype-video {
+    pointer-events: none;
+    touch-action: pan-y;
+  }
+}
+
 .jersey-box {
   background: #5C068C;
   color: #ffffff;
