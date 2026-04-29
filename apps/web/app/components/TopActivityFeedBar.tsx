@@ -6,8 +6,8 @@ import Header from "./Header";
 import { fetchSiteActivityFeed, type SiteActivityFeedItem } from "@/lib/siteActivityFeed";
 
 function resolveVisibleCount(viewportWidth: number): number {
-  if (viewportWidth >= 1750) return 6;
-  if (viewportWidth >= 1400) return 5;
+  if (viewportWidth >= 1750) return 4;
+  if (viewportWidth >= 1400) return 4;
   if (viewportWidth >= 1200) return 4;
   if (viewportWidth >= 900) return 3;
   if (viewportWidth >= 640) return 2;
