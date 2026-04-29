@@ -260,18 +260,25 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0.35rem;
   align-items: center;
   justify-content: center;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.match-list::-webkit-scrollbar {
+  display: none;
 }
 .match-item {
   display: flex;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 16rem;
+  max-width: 14rem;
   flex-direction: column;
   align-items: center;
   padding: 0.25rem 0.4rem;
   border-radius: 0.25rem;
   text-align: center;
   color: #FFC72C;
+  overflow: hidden;
 }
 .match-item .match-teams { font-weight:700; color:#ffffff; }
 .match-item .versus { margin: 0 0.25rem; color:#FFC72C; font-weight:600; }
@@ -316,7 +323,8 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .match-item {
-    min-width: 8.5rem;
+    min-width: 7rem;
+    max-width: 12rem;
   }
 
   .match-arrow {
@@ -326,7 +334,8 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (min-width: 900px) {
   .match-item {
-    min-width: 10rem;
+    min-width: 8rem;
+    max-width: 14rem;
   }
 }
 
