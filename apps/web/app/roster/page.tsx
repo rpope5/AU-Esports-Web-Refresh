@@ -11,11 +11,12 @@ import TopActivityFeedBar from "../components/TopActivityFeedBar";
 
 export default function Home() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const pages = ["Home", "Roster", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
+  const pages = ["Home", "Roster", "Staff", "Schedule", "News", "Stream", "Recruitment", "Facility", "Support", "Hall of Fame"];
 
   const pageMap: { [key: string]: string } = {
     "Home": "/",
     "Roster": "/roster",
+    "Staff": "/staff",
     "Schedule": "/schedule",
     "News": "/news",
     "Stream": "/stream",

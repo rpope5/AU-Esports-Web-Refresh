@@ -130,6 +130,7 @@ export default function Home() {
   const pages = [
     "Home",
     "Roster",
+    "Staff",
     "Schedule",
     "News",
     "Stream",
@@ -142,6 +143,7 @@ export default function Home() {
   const pageMap: Record<string, string> = {
     Home: "/",
     Roster: "/roster",
+    Staff: "/staff",
     Schedule: "/schedule",
     News: "/news",
     Stream: "/stream",

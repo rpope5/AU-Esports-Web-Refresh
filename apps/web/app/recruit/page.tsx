@@ -66,6 +66,7 @@ const graduationYears = Array.from({ length: 7 }, (_, i) => String(CURRENT_YEAR 
 const pages = [
   "Home",
   "Roster",
+  "Staff",
   "Schedule",
   "News",
   "Stream",
@@ -78,6 +79,7 @@ const pages = [
 const pageMap: Record<string, string> = {
   Home: "/",
   Roster: "/roster",
+  Staff: "/staff",
   Schedule: "/schedule",
   News: "/news",
   Stream: "/stream",

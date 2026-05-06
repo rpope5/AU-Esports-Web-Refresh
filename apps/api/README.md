@@ -25,6 +25,20 @@
 - Optional startup migration gate:
   - `RUN_DB_MIGRATIONS_ON_STARTUP=true`
 
+## Staff directory routes
+
+- Public:
+  - `GET /api/v1/staff`
+  - `GET /api/v1/staff/{slug}`
+- Admin/staff-authenticated:
+  - `GET /api/v1/admin/staff`
+  - `POST /api/v1/admin/staff`
+  - `PATCH /api/v1/admin/staff/{staff_id}`
+  - `DELETE /api/v1/admin/staff/{staff_id}` (soft deactivates profile)
+
+To seed canonical games plus the initial P.J. Fiscus profile:
+- `python seed.py`
+
 ## Key environment variables
 
 - `APP_ENV` (`development` or `production`)

@@ -27,3 +27,10 @@ Package manager: `npm` (this repo does not use npm/pnpm/yarn workspaces for `app
 - Deployment docs:
   - `../../docs/DEPLOY_VERCEL.md` (frontend)
   - `../../docs/DEPLOY_AZURE.md` (backend/data services)
+
+## Public pages
+
+- Homepage: `/`
+- Roster: `/roster`
+- Staff directory: `/staff`
+- Staff profile detail: `/staff/[slug]`

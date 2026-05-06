@@ -3,6 +3,7 @@
 A full-stack platform for Ashland University Esports:
 - Hype/news page + media
 - Team rosters and player profiles
+- Staff & leadership directory with coach profile pages (`/staff`, `/staff/[slug]`)
 - Schedules and results
 - Recruiting form + coach/admin dashboard
 - Future: AI-assisted recruiting + recap generation
@@ -18,6 +19,14 @@ A full-stack platform for Ashland University Esports:
 - `apps/web` - Next.js frontend
 - `apps/api` - FastAPI backend
 - `docs` - deployment and project documentation
+
+## Staff Directory APIs
+- `GET /api/v1/staff` (public active profiles, optional `category` and `game` filters)
+- `GET /api/v1/staff/{slug}` (public active profile detail)
+- `GET /api/v1/admin/staff` (admin/staff-authenticated full list)
+- `POST /api/v1/admin/staff` (admin create)
+- `PATCH /api/v1/admin/staff/{staff_id}` (admin update)
+- `DELETE /api/v1/admin/staff/{staff_id}` (admin deactivate)
 
 ## Local Tooling
 - Package manager: `npm`

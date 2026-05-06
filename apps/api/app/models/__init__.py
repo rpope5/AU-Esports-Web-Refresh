@@ -13,6 +13,7 @@ from .recruit import (
     RecruitReview,
 )
 from .roster import Player, PlayerGameProfile
+from .staff_profile import StaffProfile
 from .staff_game_access import StaffGameAccess
 
 # Optional but nice: define __all__
@@ -31,5 +32,6 @@ __all__ = [
     "RecruitReview",
     "Player",
     "PlayerGameProfile",
+    "StaffProfile",
     "StaffGameAccess",
 ]

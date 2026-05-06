@@ -105,6 +105,8 @@ To work with a Vercel-hosted frontend:
 7. Schedule workflows work
 8. Uploaded media renders (news + roster)
 9. No browser CORS errors for frontend/API calls
+10. `GET /api/v1/staff` returns active staff profiles
+11. `GET /api/v1/staff/{slug}` returns profile detail for active records
 
 ## Common failure points
 

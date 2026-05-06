@@ -1,8 +1,9 @@
-export type ContentImageKind = "announcement" | "roster";
+export type ContentImageKind = "announcement" | "roster" | "staff";
 
 const CONTENT_IMAGE_PLACEHOLDERS: Record<ContentImageKind, string> = {
   announcement: "/images/esports-news-placeholder.jpg",
   roster: "/placeholders/roster-member-placeholder.svg",
+  staff: "/placeholders/roster-member-placeholder.svg",
 };
 
 function trimTrailingSlashes(value: string): string {
